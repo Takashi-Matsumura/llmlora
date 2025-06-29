@@ -15,6 +15,10 @@ class DatasetType(str, Enum):
     CHAT = "chat"
     COMPLETION = "completion"
 
+class ChatMessageRole(str, Enum):
+    USER = "user"
+    ASSISTANT = "assistant"
+
 # Dataset schemas
 class DatasetCreate(BaseModel):
     name: str = Field(..., description="Dataset name")
@@ -109,3 +113,45 @@ class TrainingProgress(BaseModel):
     total_steps: int
     loss: Optional[float]
     metrics: List[TrainingMetrics]
+
+# Chat schemas
+class ChatSessionCreate(BaseModel):
+    name: str = Field(..., description="Chat session name")
+    job_id: int = Field(..., description="Training job ID")
+    settings: Optional[Dict[str, Any]] = Field(default=None, description="Generation settings")
+
+class ChatSessionResponse(BaseModel):
+    id: int
+    name: str
+    job_id: int
+    model_path: str
+    settings: Optional[Dict[str, Any]]
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class ChatMessageCreate(BaseModel):
+    content: str = Field(..., description="Message content")
+
+class ChatMessageResponse(BaseModel):
+    id: int
+    session_id: int
+    role: ChatMessageRole
+    content: str
+    timestamp: datetime
+
+    class Config:
+        from_attributes = True
+
+class ChatGenerateRequest(BaseModel):
+    session_id: int = Field(..., description="Chat session ID")
+    message: str = Field(..., description="User message")
+    temperature: Optional[float] = Field(default=0.7, ge=0.0, le=2.0, description="Generation temperature")
+    max_tokens: Optional[int] = Field(default=512, ge=1, le=4096, description="Maximum tokens to generate")
+
+class ChatGenerateResponse(BaseModel):
+    message_id: int
+    response: str
+    session_id: int

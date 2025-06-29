@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 import os
 from dotenv import load_dotenv
 
-from api.routers import models, datasets, training
+from api.routers import models, datasets, training, chat
 from database.database import init_db
 
 load_dotenv()
@@ -36,6 +36,7 @@ app.add_middleware(
 app.include_router(models.router, prefix="/api/models", tags=["models"])
 app.include_router(datasets.router, prefix="/api/datasets", tags=["datasets"])
 app.include_router(training.router, prefix="/api/training", tags=["training"])
+app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 
 @app.get("/")
 async def root():

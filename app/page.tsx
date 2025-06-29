@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button'
 import { Database, Settings, Play, Brain, Server, Activity } from 'lucide-react'
 import { DatasetManager } from '@/components/datasets/DatasetManager'
 import { TrainingManager } from '@/components/training/TrainingManager'
+import { ChatManager } from '@/components/chat/ChatManager'
 
-type Tab = 'overview' | 'datasets' | 'training'
+type Tab = 'overview' | 'datasets' | 'training' | 'ollama'
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>('overview')
@@ -16,6 +17,7 @@ export default function Home() {
     { id: 'overview' as Tab, label: '概要', icon: Activity },
     { id: 'datasets' as Tab, label: 'データセット', icon: Database },
     { id: 'training' as Tab, label: '訓練', icon: Brain },
+    { id: 'ollama' as Tab, label: 'Ollama統合', icon: Server },
   ]
 
   const renderContent = () => {
@@ -24,6 +26,8 @@ export default function Home() {
         return <DatasetManager />
       case 'training':
         return <TrainingManager />
+      case 'ollama':
+        return <ChatManager />
       default:
         return (
           <div className="space-y-6">
@@ -86,8 +90,11 @@ export default function Home() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button variant="outline" className="w-full" disabled>
-                    設定（近日公開）
+                  <Button 
+                    onClick={() => setActiveTab('ollama')}
+                    className="w-full"
+                  >
+                    チャットを開始
                   </Button>
                 </CardContent>
               </Card>

@@ -6,9 +6,9 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { Play, Pause, Square, Clock, Zap, TrendingDown, AlertCircle } from 'lucide-react'
+import { Play, Pause, Square, Clock, Zap, TrendingDown, AlertCircle, Wifi, WifiOff } from 'lucide-react'
 import { useStore } from '@/stores/useStore'
-import { trainingApi } from '@/lib/api'
+import { trainingApi, ApiError } from '@/lib/api'
 import { TrainingJob, TrainingProgress as TrainingProgressType } from '@/types'
 
 interface TrainingProgressProps {
@@ -18,7 +18,10 @@ interface TrainingProgressProps {
 export function TrainingProgress({ job }: TrainingProgressProps) {
   const { updateTrainingJob, trainingProgress, setTrainingProgress, setError } = useStore()
   const [isPolling, setIsPolling] = useState(job.status === 'running')
+  const [connectionError, setConnectionError] = useState<string | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const maxRetries = 10 // Increased for training jobs
 
   const progress = trainingProgress[job.id]
 
@@ -35,7 +38,7 @@ export function TrainingProgress({ job }: TrainingProgressProps) {
   const startPolling = () => {
     if (intervalRef.current) return
 
-    intervalRef.current = setInterval(async () => {
+    const poll = async () => {
       try {
         const [jobData, progressData] = await Promise.all([
           trainingApi.getJob(job.id),
@@ -44,14 +47,48 @@ export function TrainingProgress({ job }: TrainingProgressProps) {
 
         updateTrainingJob(job.id, jobData)
         setTrainingProgress(job.id, progressData)
+        
+        // Reset connection error and retry count on success
+        setConnectionError(null)
+        setRetryCount(0)
 
         if (jobData.status === 'completed' || jobData.status === 'failed' || jobData.status === 'cancelled') {
           stopPolling()
         }
       } catch (error) {
         console.error('Failed to fetch training progress:', error)
+        
+        if (error instanceof ApiError) {
+          setConnectionError(error.message)
+        } else {
+          setConnectionError('接続エラーが発生しました')
+        }
+        
+        const newRetryCount = retryCount + 1
+        setRetryCount(newRetryCount)
+        
+        // Stop polling after max retries for network errors
+        if (newRetryCount >= maxRetries) {
+          console.error(`Max retries (${maxRetries}) reached, stopping polling`)
+          stopPolling()
+          setError('ネットワークエラーが継続しています。モデルのダウンロードに時間がかかっている可能性があります。しばらく待ってから「再接続」ボタンを押してください。')
+        }
       }
-    }, 2000) // Poll every 2 seconds
+    }
+
+    // Initial poll
+    poll()
+    
+    // Set up interval with adaptive frequency based on job status
+    let interval
+    if (job.status === 'running') {
+      // More frequent polling during training
+      interval = Math.min(2000 * Math.pow(1.1, retryCount), 5000) // 2s, 2.2s, 2.4s, ... 5s max during training
+    } else {
+      // Less frequent for other states
+      interval = Math.min(5000 * Math.pow(1.2, retryCount), 15000) // 5s, 6s, 7.2s, ... 15s max
+    }
+    intervalRef.current = setInterval(poll, interval)
   }
 
   const stopPolling = () => {
@@ -62,14 +99,27 @@ export function TrainingProgress({ job }: TrainingProgressProps) {
     setIsPolling(false)
   }
 
+  const retryConnection = () => {
+    setConnectionError(null)
+    setRetryCount(0)
+    stopPolling() // Stop existing polling first
+    if (job.status === 'running' || job.status === 'pending') {
+      startPolling()
+    }
+  }
+
   const handleCancel = async () => {
-    if (!confirm('Are you sure you want to cancel this training job?')) return
+    if (!confirm('このトレーニングジョブをキャンセルしますか？')) return
 
     try {
       await trainingApi.cancelJob(job.id)
       updateTrainingJob(job.id, { status: 'cancelled' })
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to cancel job')
+      if (error instanceof ApiError) {
+        setError(error.message)
+      } else {
+        setError('ジョブのキャンセルに失敗しました')
+      }
     }
   }
 
@@ -133,6 +183,18 @@ export function TrainingProgress({ job }: TrainingProgressProps) {
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
+            {connectionError && (
+              <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                <WifiOff className="h-3 w-3 mr-1" />
+                接続エラー
+              </Badge>
+            )}
+            {!connectionError && isPolling && (
+              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                <Wifi className="h-3 w-3 mr-1" />
+                ライブ
+              </Badge>
+            )}
             <Badge className={getStatusColor(job.status)}>
               {job.status.toUpperCase()}
             </Badge>
@@ -267,11 +329,55 @@ export function TrainingProgress({ job }: TrainingProgressProps) {
           </div>
         </div>
 
-        {/* Error Message */}
+        {/* Connection Error */}
+        {connectionError && (
+          <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-semibold text-orange-800 mb-2">接続エラー</h4>
+                <p className="text-sm text-orange-700 mb-2">{connectionError}</p>
+                <p className="text-xs text-orange-600">再試行回数: {Math.min(retryCount, maxRetries)}/{maxRetries}</p>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={retryConnection}
+              >
+                再接続
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Training Status/Error Message */}
         {job.error_message && (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-            <h4 className="font-semibold text-red-800 mb-2">Error</h4>
-            <p className="text-sm text-red-700">{job.error_message}</p>
+          <div className={`p-4 border rounded-lg ${
+            job.error_message.includes('中...') || job.error_message.includes('準備中') || job.error_message.includes('ロード中') || job.error_message.includes('ダウンロード中') || job.error_message.includes('適用中')
+              ? 'bg-blue-50 border-blue-200'
+              : 'bg-red-50 border-red-200'
+          }`}>
+            <h4 className={`font-semibold mb-2 ${
+              job.error_message.includes('中...') || job.error_message.includes('準備中') || job.error_message.includes('ロード中') || job.error_message.includes('ダウンロード中') || job.error_message.includes('適用中')
+                ? 'text-blue-800'
+                : 'text-red-800'
+            }`}>
+              {job.error_message.includes('中...') || job.error_message.includes('準備中') || job.error_message.includes('ロード中') || job.error_message.includes('ダウンロード中') || job.error_message.includes('適用中')
+                ? '初期化中'
+                : 'トレーニングエラー'
+              }
+            </h4>
+            <p className={`text-sm ${
+              job.error_message.includes('中...') || job.error_message.includes('準備中') || job.error_message.includes('ロード中') || job.error_message.includes('ダウンロード中') || job.error_message.includes('適用中')
+                ? 'text-blue-700'
+                : 'text-red-700'
+            }`}>
+              {job.error_message}
+            </p>
+            {job.error_message.includes('ダウンロード中') && (
+              <p className="text-xs text-blue-600 mt-1">
+                初回モデルダウンロードには数分かかる場合があります。
+              </p>
+            )}
           </div>
         )}
       </CardContent>

@@ -68,14 +68,20 @@ class TrainingService:
             await db.commit()
 
             # Load model and tokenizer
-            logger.info(f"Loading model: {job.model_name}")
+            logger.info(f"Loading model: {job.model_name} -> {self._resolve_model_name(job.model_name)}")
             model_name = self._resolve_model_name(job.model_name)
             
+            # Update job status to indicate model loading
+            job.error_message = "モデルをダウンロード中..."
+            await db.commit()
+            
+            logger.info(f"Loading tokenizer for {model_name}...")
             tokenizer = AutoTokenizer.from_pretrained(
                 model_name,
                 cache_dir=self.model_cache_dir,
                 trust_remote_code=True
             )
+            logger.info("Tokenizer loaded successfully")
             
             if tokenizer.pad_token is None:
                 tokenizer.pad_token = tokenizer.eos_token
@@ -84,6 +90,10 @@ class TrainingService:
             device = "cuda" if torch.cuda.is_available() else "cpu"
             dtype = torch.float16 if device == "cuda" else torch.float32
             
+            logger.info(f"Loading model {model_name} with dtype {dtype}...")
+            job.error_message = "モデルファイルをロード中..."
+            await db.commit()
+            
             model = AutoModelForCausalLM.from_pretrained(
                 model_name,
                 cache_dir=self.model_cache_dir,
@@ -91,6 +101,7 @@ class TrainingService:
                 torch_dtype=dtype,
                 trust_remote_code=True
             )
+            logger.info("Model loaded successfully")
             
             # Move model to appropriate device if not using device_map
             if device == "cpu":
@@ -107,13 +118,23 @@ class TrainingService:
             )
 
             # Apply LoRA to model
+            logger.info("Applying LoRA configuration...")
+            job.error_message = "LoRA設定を適用中..."
+            await db.commit()
+            
             model = get_peft_model(model, lora_config)
             model.print_trainable_parameters()
+            logger.info("LoRA configuration applied successfully")
 
             # Prepare dataset
+            logger.info("Preparing training dataset...")
+            job.error_message = "データセットを準備中..."
+            await db.commit()
+            
             train_dataset = self._prepare_dataset(dataset.data, tokenizer, job.training_config["max_length"])
+            logger.info(f"Dataset prepared with {len(train_dataset)} samples")
 
-            # Training arguments
+            # Training arguments with more frequent logging
             training_args = TrainingArguments(
                 output_dir=str(job_output_dir),
                 num_train_epochs=job.training_config["num_epochs"],
@@ -122,7 +143,7 @@ class TrainingService:
                 warmup_ratio=job.training_config["warmup_ratio"],
                 learning_rate=job.training_config["learning_rate"],
                 weight_decay=job.training_config["weight_decay"],
-                logging_steps=job.training_config["logging_steps"],
+                logging_steps=1,  # Log every step for real-time updates
                 save_steps=job.training_config["save_steps"],
                 save_total_limit=3,
                 remove_unused_columns=False,
@@ -130,6 +151,8 @@ class TrainingService:
                 report_to=None,
                 no_cuda=True if device == "cpu" else False,
                 use_cpu=True if device == "cpu" else False,
+                logging_strategy="steps",
+                evaluation_strategy="no",
             )
 
             # Data collator
@@ -148,9 +171,16 @@ class TrainingService:
                 db_session=db
             )
 
+            # Clear status message and start training
+            job.error_message = None
+            job.total_steps = len(train_dataset) // job.training_config["batch_size"] * job.training_config["num_epochs"]
+            await db.commit()
+            
             # Start training
-            logger.info(f"Starting training for job {job.id}")
+            logger.info(f"Starting training for job {job.id} with {job.total_steps} total steps")
             trainer.train()
+            
+            logger.info(f"Training completed for job {job.id}")
 
             # Save final model
             final_model_path = job_output_dir / "final_model"
@@ -174,17 +204,17 @@ class TrainingService:
         """Resolve Ollama model name to HuggingFace model name"""
         # Map common Ollama models to HuggingFace equivalents
         model_mapping = {
-            "llama2": "microsoft/DialoGPT-medium",  # Temporary for testing
-            "llama2:7b": "microsoft/DialoGPT-medium",  # Temporary for testing
-            "llama2:13b": "microsoft/DialoGPT-medium",  # Temporary for testing
-            # TODO: Use actual models when ready for production:
-            # "llama2:7b": "meta-llama/Llama-2-7b-hf",
-            # "llama2:13b": "meta-llama/Llama-2-13b-hf", 
-            # "gemma": "google/gemma-7b",
-            # "mistral": "mistralai/Mistral-7B-Instruct-v0.1",
-            "codellama": "microsoft/DialoGPT-medium",
-            "mistral": "microsoft/DialoGPT-medium",
-            "gemma": "microsoft/DialoGPT-medium",
+            # Using smaller models for faster training on MacBook Air M4
+            "llama2": "microsoft/DialoGPT-medium",  # Stable and fast
+            "llama2:7b": "microsoft/DialoGPT-medium",  # Stable and fast
+            "llama2:13b": "microsoft/DialoGPT-medium",  # Stable and fast
+            "gemma": "microsoft/DialoGPT-medium",  # Stable and fast
+            "gemma:7b": "microsoft/DialoGPT-medium",  # Stable and fast
+            "mistral": "microsoft/DialoGPT-medium",  # Stable and fast
+            "codellama": "microsoft/DialoGPT-medium",  # Stable and fast
+            
+            # Japanese models (for future use when stable)
+            "japanese": "rinna/japanese-gpt-neox-3.6b",  # Japanese specialized model
         }
         
         return model_mapping.get(model_name, "microsoft/DialoGPT-medium")
@@ -193,8 +223,14 @@ class TrainingService:
         """Get appropriate target modules for the given model"""
         # Define target modules for different model architectures
         model_modules = {
-            "microsoft/DialoGPT-medium": ["c_attn", "c_proj"],
-            "microsoft/DialoGPT-large": ["c_attn", "c_proj"],
+            # GPT-2 based models (DialoGPT)
+            "microsoft/DialoGPT": ["c_attn", "c_proj"],
+            
+            # Japanese models (GPT-NeoX architecture)
+            "rinna/japanese-gpt-neox": ["query_key_value", "dense"],
+            "cyberagent/open-calm": ["query_key_value", "dense"],
+            
+            # LLaMA based models
             "meta-llama": ["q_proj", "v_proj", "k_proj", "o_proj"],
             "mistralai": ["q_proj", "v_proj", "k_proj", "o_proj"],
             "google/gemma": ["q_proj", "v_proj", "k_proj", "o_proj"],
@@ -205,21 +241,26 @@ class TrainingService:
             if model_prefix in model_name:
                 return modules
                 
-        # Default fallback
+        # Default fallback for GPT-2 based models (most common)
         return ["c_attn", "c_proj"]
 
     def _prepare_dataset(self, data: list, tokenizer, max_length: int) -> HFDataset:
         """Prepare dataset for training"""
-        # Prepare text data
+        # Prepare text data with appropriate formatting for DialoGPT
         texts = []
         for item in data:
             if "instruction" in item and "output" in item:
-                text = f"### Instruction:\n{item['instruction']}\n\n### Response:\n{item['output']}"
+                # Format for Japanese instruction-response pairs
+                text = f"User: {item['instruction']} Bot: {item['output']}<|endoftext|>"
             elif "input" in item and "output" in item:
-                text = f"{item['input']}\n{item['output']}"
+                # Format for simple input-output pairs
+                text = f"User: {item['input']} Bot: {item['output']}<|endoftext|>"
+            elif "question" in item and "answer" in item:
+                # Format for Q&A pairs
+                text = f"User: {item['question']} Bot: {item['answer']}<|endoftext|>"
             else:
                 # Generic text format
-                text = str(item)
+                text = f"User: {str(item)} Bot: こんにちは<|endoftext|>"
             texts.append(text)
         
         def tokenize_function(examples):
@@ -278,38 +319,58 @@ class TrainerWithProgress(Trainer):
         """Override log method to save metrics to database"""
         super().log(logs)
         
-        # Save metrics to database
-        asyncio.create_task(self._save_metrics(logs))
-
-    async def _save_metrics(self, logs: Dict[str, float]):
-        """Save training metrics to database"""
+        # Save metrics to database synchronously to avoid session conflicts
         try:
-            if "loss" in logs and "epoch" in logs:
-                metric = DBTrainingMetrics(
-                    job_id=self.job_id,
-                    step=self.state.global_step,
-                    epoch=int(logs["epoch"]),
-                    loss=logs["loss"],
-                    learning_rate=logs.get("learning_rate", 0),
-                )
-                
-                self.db_session.add(metric)
-                
-                # Update job progress
-                progress = (logs["epoch"] / self.args.num_train_epochs) * 100
-                await self.db_session.execute(
-                    update(TrainingJob)
-                    .where(TrainingJob.id == self.job_id)
-                    .values(
-                        progress=progress,
-                        current_epoch=int(logs["epoch"]),
-                        current_step=self.state.global_step,
-                        total_steps=self.state.max_steps,
-                        loss=logs["loss"]
+            import asyncio
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # If we're in an async context, schedule the update
+                asyncio.create_task(self._save_metrics_safely(logs))
+            else:
+                # Run synchronously
+                loop.run_until_complete(self._save_metrics_safely(logs))
+        except Exception as e:
+            logger.error(f"Failed to schedule metrics save: {e}")
+
+    async def _save_metrics_safely(self, logs: Dict[str, float]):
+        """Save training metrics to database with separate session"""
+        try:
+            # Use a new database session to avoid conflicts
+            async with AsyncSessionLocal() as new_session:
+                if "loss" in logs and "epoch" in logs:
+                    # Save metric
+                    metric = DBTrainingMetrics(
+                        job_id=self.job_id,
+                        step=self.state.global_step,
+                        epoch=int(logs["epoch"]),
+                        loss=logs["loss"],
+                        learning_rate=logs.get("learning_rate", 0),
                     )
-                )
-                
-                await self.db_session.commit()
+                    
+                    new_session.add(metric)
+                    
+                    # Update job progress
+                    progress = (logs["epoch"] / self.args.num_train_epochs) * 100
+                    await new_session.execute(
+                        update(TrainingJob)
+                        .where(TrainingJob.id == self.job_id)
+                        .values(
+                            progress=progress,
+                            current_epoch=int(logs["epoch"]),
+                            current_step=self.state.global_step,
+                            total_steps=self.state.max_steps,
+                            loss=logs["loss"]
+                        )
+                    )
+                    
+                    await new_session.commit()
+                    logger.info(f"Progress updated: {progress:.1f}% (Epoch {int(logs['epoch'])}, Step {self.state.global_step})")
                 
         except Exception as e:
             logger.error(f"Failed to save metrics: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+    
+    async def _save_metrics(self, logs: Dict[str, float]):
+        """Legacy method for backward compatibility"""
+        await self._save_metrics_safely(logs)
