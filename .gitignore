@@ -39,3 +39,27 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+
+# Training data and models (exclude large files)
+backend/model_cache/
+backend/training_data/
+*.bin
+*.safetensors
+
+# Docker logs
+*.log
+
+# Database
+*.db
+*.sqlite

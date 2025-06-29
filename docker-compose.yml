@@ -1,0 +1,90 @@
+services:
+  # Ollama LLM Server
+  ollama:
+    image: ollama/ollama:latest
+    container_name: llmlora-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    networks:
+      - llmlora-network
+    # GPU support (uncomment if you have NVIDIA Docker runtime)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    restart: unless-stopped
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: llmlora-postgres
+    environment:
+      POSTGRES_DB: llmlora
+      POSTGRES_USER: llmlora
+      POSTGRES_PASSWORD: llmlora_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - llmlora-network
+    restart: unless-stopped
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: llmlora-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - model_cache:/app/model_cache
+      - training_data:/app/training_data
+    environment:
+      - DATABASE_URL=postgresql://llmlora:llmlora_password@postgres:5432/llmlora
+      - OLLAMA_URL=http://ollama:11434
+      - PYTHONPATH=/app
+    depends_on:
+      - postgres
+      - ollama
+    networks:
+      - llmlora-network
+    restart: unless-stopped
+
+  # Next.js Frontend (Development)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: llmlora-frontend
+    ports:
+      - "3000:3000" 
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+    networks:
+      - llmlora-network
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
+  postgres_data:
+  model_cache:
+  training_data:
+
+networks:
+  llmlora-network:
+    driver: bridge
