@@ -11,7 +11,7 @@ import { TrainingJobForm } from './TrainingJobForm'
 import { TrainingProgress } from './TrainingProgress'
 
 export function TrainingManager() {
-  const { trainingJobs, setTrainingJobs, removeTrainingJob, setError, setIsLoading } = useStore()
+  const { trainingJobs, setTrainingJobs, setError, setIsLoading } = useStore()
   const [showForm, setShowForm] = useState(false)
   const [selectedJob, setSelectedJob] = useState<number | null>(null)
 
@@ -36,7 +36,8 @@ export function TrainingManager() {
 
     try {
       await trainingApi.deleteJob(id)
-      removeTrainingJob(id)
+      // Reload the training jobs list to ensure UI is updated
+      await loadTrainingJobs()
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to delete job')
     }
@@ -96,7 +97,7 @@ export function TrainingManager() {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-2xl font-bold">訓練進捗</h2>
+            <h2 className="text-2xl font-bold">LLMトレーニング進捗</h2>
             <p className="text-muted-foreground">訓練ジョブをリアルタイムで監視</p>
           </div>
           <Button variant="outline" onClick={() => setSelectedJob(null)}>
@@ -112,12 +113,15 @@ export function TrainingManager() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold">訓練ジョブ</h2>
+          <h2 className="text-2xl font-bold">LLMトレーニング</h2>
           <p className="text-muted-foreground">LoRAファインチューニングジョブを管理</p>
         </div>
-        <Button onClick={() => setShowForm(true)}>
+        <Button 
+          onClick={() => setShowForm(true)}
+          className="bg-blue-600 hover:bg-blue-700 text-white border border-blue-600 hover:border-blue-700 transition-colors"
+        >
           <Plus className="h-4 w-4 mr-2" />
-          新しい訓練ジョブ
+          新しいトレーニングジョブ
         </Button>
       </div>
 

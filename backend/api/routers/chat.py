@@ -71,6 +71,8 @@ async def delete_chat_session(
     try:
         await chat_service.delete_session(session_id)
         return {"message": "Session deleted successfully"}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete session: {e}")
 

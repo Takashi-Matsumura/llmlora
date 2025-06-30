@@ -144,7 +144,7 @@ export function TrainingJobForm() {
             <Button 
               type="submit" 
               disabled={isSubmitting || !jobName || !selectedModel || !selectedDataset}
-              className="w-full"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white border border-blue-600 hover:border-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
                 <>

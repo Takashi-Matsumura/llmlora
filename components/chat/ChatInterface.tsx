@@ -210,7 +210,11 @@ export function ChatInterface({ session }: ChatInterfaceProps) {
               className="flex-1"
               autoFocus
             />
-            <Button type="submit" disabled={!newMessage.trim() || isLoading}>
+            <Button 
+              type="submit" 
+              disabled={!newMessage.trim() || isLoading}
+              className="bg-blue-600 hover:bg-blue-700 text-white border border-blue-600 hover:border-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               <Send className="h-4 w-4" />
             </Button>
           </form>

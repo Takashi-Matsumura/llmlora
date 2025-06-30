@@ -32,6 +32,35 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     }
   }
 
+  const formatMessageContent = (content: string) => {
+    // Escape HTML first to prevent XSS
+    const escaped = content
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+    
+    // Convert **text** to <strong>text</strong> (bold)
+    const boldFormatted = escaped.replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>')
+    
+    // Convert *text* to <em>text</em> (italic) - but avoid already processed bold text
+    let italicFormatted = boldFormatted
+    // Simple approach: replace single * that are not part of ** pairs
+    const parts = italicFormatted.split(/(\*\*[^*]+?\*\*)/g)
+    italicFormatted = parts.map(part => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return part // Keep bold parts unchanged
+      }
+      return part.replace(/\*([^*]+?)\*/g, '<em>$1</em>')
+    }).join('')
+    
+    // Convert line breaks to <br>
+    const lineBreaksFormatted = italicFormatted.replace(/\n/g, '<br>')
+    
+    return lineBreaksFormatted
+  }
+
   const isUser = message.role === 'user'
 
   return (
@@ -48,9 +77,10 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             ? 'bg-primary text-primary-foreground ml-8' 
             : 'bg-background border text-foreground mr-8'
         }`}>
-          <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">
-            {message.content}
-          </div>
+          <div 
+            className="whitespace-pre-wrap break-words text-sm leading-relaxed [&>strong]:font-bold [&>em]:italic [&>strong]:text-inherit [&>em]:text-inherit"
+            dangerouslySetInnerHTML={{ __html: formatMessageContent(message.content) }}
+          />
         </div>
         
         <div className="text-xs text-muted-foreground mt-1 px-1">

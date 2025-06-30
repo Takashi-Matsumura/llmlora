@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { MessageSquare, Plus, Bot } from 'lucide-react'
+import { MessageSquare, Plus } from 'lucide-react'
 import { ChatSessionList } from './ChatSessionList'
 import { ChatInterface } from './ChatInterface'
 import { NewSessionDialog } from './NewSessionDialog'
@@ -19,8 +19,9 @@ interface TrainingJob {
 interface ChatSession {
   id: number
   name: string
-  job_id: number
-  model_path: string
+  job_id?: number
+  model_name?: string
+  model_path?: string
   settings: any
   created_at: string
   updated_at: string
@@ -67,7 +68,7 @@ export function ChatManager() {
     }
   }
 
-  const handleCreateSession = async (sessionData: { name: string; job_id: number; settings?: any }) => {
+  const handleCreateSession = async (sessionData: { name: string; job_id?: number; model_name?: string; settings?: any }) => {
     try {
       const response = await fetch('http://localhost:8000/api/chat/sessions', {
         method: 'POST',
@@ -101,6 +102,8 @@ export function ChatManager() {
         if (selectedSession?.id === sessionId) {
           setSelectedSession(null)
         }
+      } else {
+        console.error('Failed to delete session:', response.status, response.statusText)
       }
     } catch (error) {
       console.error('Error deleting session:', error)
@@ -115,43 +118,13 @@ export function ChatManager() {
     )
   }
 
-  if (completedJobs.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Bot className="h-5 w-5" />
-            <CardTitle>Ollama統合</CardTitle>
-          </div>
-          <CardDescription>
-            ファインチューニング済みモデルとのチャット
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center space-y-4">
-            <div className="text-muted-foreground">
-              チャットを開始するには、まず訓練を完了したモデルが必要です。
-            </div>
-            <div className="text-sm text-muted-foreground">
-              「訓練」タブでLoRAファインチューニングを完了してから、こちらに戻ってきてください。
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
+  // Always show the interface - Ollama models are available even without training jobs
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Ollama統合</h2>
-          <p className="text-muted-foreground">ファインチューニング済みモデルとチャット</p>
-        </div>
-        <Button onClick={() => setShowNewSessionDialog(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          新しいセッション
-        </Button>
+      <div>
+        <h2 className="text-2xl font-bold">チャットシミュレーション</h2>
+        <p className="text-muted-foreground">ファインチューニング済みモデルとオリジナルモデルでチャット</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -161,6 +134,7 @@ export function ChatManager() {
             selectedSession={selectedSession}
             onSelectSession={setSelectedSession}
             onDeleteSession={handleDeleteSession}
+            onCreateSession={() => setShowNewSessionDialog(true)}
           />
         </div>
         

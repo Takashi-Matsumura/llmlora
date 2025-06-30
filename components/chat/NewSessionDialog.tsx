@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
 import { X } from 'lucide-react'
+import { modelsApi } from '@/lib/api'
 
 interface TrainingJob {
   id: number
@@ -17,10 +18,21 @@ interface TrainingJob {
   model_path: string
 }
 
+interface OllamaModel {
+  name: string
+  size: number
+  digest: string
+  modified_at: string
+}
+
+type ModelOption = 
+  | { type: 'training'; job: TrainingJob }
+  | { type: 'ollama'; model: OllamaModel }
+
 interface NewSessionDialogProps {
   isOpen: boolean
   onClose: () => void
-  onCreateSession: (sessionData: { name: string; job_id: number; settings?: any }) => void
+  onCreateSession: (sessionData: { name: string; job_id?: number; model_name?: string; settings?: any }) => void
   completedJobs: TrainingJob[]
 }
 
@@ -31,29 +43,62 @@ export function NewSessionDialog({
   completedJobs
 }: NewSessionDialogProps) {
   const [sessionName, setSessionName] = useState('')
-  const [selectedJobId, setSelectedJobId] = useState<string>('')
+  const [selectedModel, setSelectedModel] = useState<string>('')
   const [temperature, setTemperature] = useState([0.7])
   const [maxTokens, setMaxTokens] = useState([512])
+  const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([])
+  const [loading, setLoading] = useState(false)
+
+  // Load Ollama models when dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      loadOllamaModels()
+    }
+  }, [isOpen])
+
+  const loadOllamaModels = async () => {
+    try {
+      setLoading(true)
+      const response = await modelsApi.list()
+      setOllamaModels(response.models || [])
+    } catch (error) {
+      console.error('Failed to load Ollama models:', error)
+      setOllamaModels([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!sessionName.trim() || !selectedJobId) {
+    if (!sessionName.trim() || !selectedModel) {
       return
     }
 
-    onCreateSession({
+    // Determine if it's a training job or Ollama model
+    const isTrainingModel = selectedModel.startsWith('training:')
+    const isOllamaModel = selectedModel.startsWith('ollama:')
+
+    const sessionData: any = {
       name: sessionName.trim(),
-      job_id: parseInt(selectedJobId),
       settings: {
         temperature: temperature[0],
         max_tokens: maxTokens[0]
       }
-    })
+    }
+
+    if (isTrainingModel) {
+      sessionData.job_id = parseInt(selectedModel.replace('training:', ''))
+    } else if (isOllamaModel) {
+      sessionData.model_name = selectedModel.replace('ollama:', '')
+    }
+
+    onCreateSession(sessionData)
 
     // Reset form
     setSessionName('')
-    setSelectedJobId('')
+    setSelectedModel('')
     setTemperature([0.7])
     setMaxTokens([512])
   }
@@ -86,48 +131,97 @@ export function NewSessionDialog({
 
             <div className="space-y-2">
               <Label htmlFor="model">モデル選択</Label>
-              <Select value={selectedJobId} onValueChange={setSelectedJobId} required>
+              <Select value={selectedModel} onValueChange={setSelectedModel} required>
                 <SelectTrigger>
-                  <SelectValue placeholder="ファインチューニング済みモデルを選択" />
+                  <SelectValue placeholder="モデルを選択してください" />
                 </SelectTrigger>
                 <SelectContent>
-                  {completedJobs.map((job) => (
-                    <SelectItem key={job.id} value={job.id.toString()}>
-                      {job.name} ({job.model_name})
-                    </SelectItem>
-                  ))}
+                  {/* ファインチューニング済みモデル */}
+                  {completedJobs.length > 0 && (
+                    <>
+                      <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
+                        ファインチューニング済みモデル
+                      </div>
+                      {completedJobs.map((job) => (
+                        <SelectItem key={`training:${job.id}`} value={`training:${job.id}`}>
+                          🎯 {job.name} ({job.model_name})
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                  
+                  {/* オリジナルOllamaモデル */}
+                  {ollamaModels.length > 0 && (
+                    <>
+                      {completedJobs.length > 0 && (
+                        <div className="border-t my-1" />
+                      )}
+                      <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
+                        オリジナルモデル (Ollama)
+                      </div>
+                      {ollamaModels.map((model) => (
+                        <SelectItem key={`ollama:${model.name}`} value={`ollama:${model.name}`}>
+                          🤖 {model.name} ({(model.size / 1e9).toFixed(1)}GB)
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                  
+                  {loading && (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                      モデルを読み込み中...
+                    </div>
+                  )}
+                  
+                  {!loading && completedJobs.length === 0 && ollamaModels.length === 0 && (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                      利用可能なモデルがありません
+                    </div>
+                  )}
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Temperature: {temperature[0]}</Label>
-                <Slider
-                  value={temperature}
-                  onValueChange={setTemperature}
-                  max={2}
-                  min={0}
-                  step={0.1}
-                  className="w-full"
-                />
-                <div className="text-xs text-muted-foreground">
-                  低い値はより決定的な回答、高い値はより創造的な回答
+            <div className="space-y-6">
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <Label className="text-sm font-medium">Temperature:</Label>
+                  <span className="text-sm font-semibold text-blue-600">{temperature[0]}</span>
+                </div>
+                <div className="px-2">
+                  <Slider
+                    value={temperature}
+                    onValueChange={setTemperature}
+                    max={2}
+                    min={0}
+                    step={0.1}
+                    className="w-full"
+                  />
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground px-2">
+                  <span>決定的</span>
+                  <span>創造的</span>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>最大トークン数: {maxTokens[0]}</Label>
-                <Slider
-                  value={maxTokens}
-                  onValueChange={setMaxTokens}
-                  max={2048}
-                  min={64}
-                  step={64}
-                  className="w-full"
-                />
-                <div className="text-xs text-muted-foreground">
-                  生成される回答の最大長さ
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <Label className="text-sm font-medium">最大トークン数:</Label>
+                  <span className="text-sm font-semibold text-blue-600">{maxTokens[0]}</span>
+                </div>
+                <div className="px-2">
+                  <Slider
+                    value={maxTokens}
+                    onValueChange={setMaxTokens}
+                    max={2048}
+                    min={64}
+                    step={64}
+                    className="w-full"
+                  />
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground px-2">
+                  <span>短い</span>
+                  <span>長い</span>
                 </div>
               </div>
             </div>
@@ -136,7 +230,10 @@ export function NewSessionDialog({
               <Button type="button" variant="outline" onClick={onClose} className="flex-1">
                 キャンセル
               </Button>
-              <Button type="submit" className="flex-1">
+              <Button 
+                type="submit" 
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white border border-blue-600 hover:border-blue-700 transition-colors"
+              >
                 作成
               </Button>
             </div>

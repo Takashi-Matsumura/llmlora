@@ -1,14 +1,26 @@
 'use client'
 
+import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { MessageSquare, Trash2 } from 'lucide-react'
+import { MessageSquare, Trash2, Plus } from 'lucide-react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 interface ChatSession {
   id: number
   name: string
-  job_id: number
-  model_path: string
+  job_id?: number
+  model_name?: string
+  model_path?: string
   settings: any
   created_at: string
   updated_at: string
@@ -19,14 +31,19 @@ interface ChatSessionListProps {
   selectedSession: ChatSession | null
   onSelectSession: (session: ChatSession) => void
   onDeleteSession: (sessionId: number) => void
+  onCreateSession: () => void
 }
 
 export function ChatSessionList({
   sessions,
   selectedSession,
   onSelectSession,
-  onDeleteSession
+  onDeleteSession,
+  onCreateSession
 }: ChatSessionListProps) {
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [sessionToDelete, setSessionToDelete] = useState<ChatSession | null>(null)
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('ja-JP', {
       month: 'short',
@@ -36,13 +53,37 @@ export function ChatSessionList({
     })
   }
 
+  const handleDeleteClick = (session: ChatSession) => {
+    setSessionToDelete(session)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleConfirmDelete = () => {
+    if (sessionToDelete) {
+      onDeleteSession(sessionToDelete.id)
+      setDeleteDialogOpen(false)
+      setSessionToDelete(null)
+    }
+  }
+
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="pb-0">
         <CardTitle className="flex items-center gap-2">
           <MessageSquare className="h-4 w-4" />
           チャットセッション
         </CardTitle>
+        <div className="pt-3 pb-3 border-b">
+          <Button
+            size="sm"
+            onClick={onCreateSession}
+            className="w-full"
+            variant="outline"
+          >
+            <Plus className="h-3 w-3 mr-1" />
+            新規セッション
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="p-0">
         <div className="space-y-1">
@@ -71,10 +112,10 @@ export function ChatSessionList({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-6 w-6 p-0"
+                    className="h-6 w-6 p-0 hover:text-red-600"
                     onClick={(e) => {
                       e.stopPropagation()
-                      onDeleteSession(session.id)
+                      handleDeleteClick(session)
                     }}
                   >
                     <Trash2 className="h-3 w-3" />
@@ -85,6 +126,28 @@ export function ChatSessionList({
           )}
         </div>
       </CardContent>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>セッションを削除</AlertDialogTitle>
+            <AlertDialogDescription>
+              チャットセッション「{sessionToDelete?.name}」を削除しますか？
+              <br />
+              この操作は元に戻せません。すべてのメッセージも削除されます。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>キャンセル</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmDelete}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              削除する
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }

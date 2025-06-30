@@ -117,14 +117,30 @@ class TrainingProgress(BaseModel):
 # Chat schemas
 class ChatSessionCreate(BaseModel):
     name: str = Field(..., description="Chat session name")
-    job_id: int = Field(..., description="Training job ID")
+    job_id: Optional[int] = Field(default=None, description="Training job ID (for fine-tuned models)")
+    model_name: Optional[str] = Field(default=None, description="Ollama model name (for original models)")
     settings: Optional[Dict[str, Any]] = Field(default=None, description="Generation settings")
+    
+    @classmethod
+    def model_validate(cls, values):
+        if isinstance(values, dict):
+            job_id = values.get('job_id')
+            model_name = values.get('model_name')
+            
+            # Either job_id or model_name must be provided, but not both
+            if not job_id and not model_name:
+                raise ValueError('Either job_id or model_name must be provided')
+            if job_id and model_name:
+                raise ValueError('Only one of job_id or model_name should be provided')
+        
+        return super().model_validate(values)
 
 class ChatSessionResponse(BaseModel):
     id: int
     name: str
-    job_id: int
-    model_path: str
+    job_id: Optional[int]
+    model_name: Optional[str]
+    model_path: Optional[str]
     settings: Optional[Dict[str, Any]]
     created_at: datetime
     updated_at: datetime

@@ -18,6 +18,7 @@ interface AppState {
   trainingJobs: TrainingJob[]
   setTrainingJobs: (jobs: TrainingJob[]) => void
   addTrainingJob: (job: TrainingJob) => void
+  removeTrainingJob: (id: number) => void
   updateTrainingJob: (id: number, updates: Partial<TrainingJob>) => void
 
   // Training progress
@@ -51,6 +52,9 @@ export const useStore = create<AppState>((set, get) => ({
   setTrainingJobs: (trainingJobs) => set({ trainingJobs }),
   addTrainingJob: (job) => set((state) => ({ 
     trainingJobs: [...state.trainingJobs, job] 
+  })),
+  removeTrainingJob: (id) => set((state) => ({
+    trainingJobs: state.trainingJobs.filter(job => job.id !== id)
   })),
   updateTrainingJob: (id, updates) => set((state) => ({
     trainingJobs: state.trainingJobs.map(job => 

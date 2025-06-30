@@ -91,10 +91,13 @@ export function DatasetManager() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold">データセット</h2>
+          <h2 className="text-2xl font-bold">データセット作成</h2>
           <p className="text-muted-foreground">訓練データセットを管理</p>
         </div>
-        <Button onClick={() => setShowUpload(true)}>
+        <Button 
+          onClick={() => setShowUpload(true)}
+          className="bg-blue-600 hover:bg-blue-700 text-white border border-blue-600 hover:border-blue-700 transition-colors"
+        >
           <Upload className="h-4 w-4 mr-2" />
           データセットをアップロード
         </Button>
@@ -156,7 +159,12 @@ export function DatasetManager() {
               </div>
 
               <div className="flex gap-2">
-                <Button type="submit">アップロード</Button>
+                <Button 
+                  type="submit"
+                  className="bg-blue-600 hover:bg-blue-700 text-white border border-blue-600 hover:border-blue-700 transition-colors"
+                >
+                  アップロード
+                </Button>
                 <Button type="button" variant="outline" onClick={() => setShowUpload(false)}>
                   キャンセル
                 </Button>

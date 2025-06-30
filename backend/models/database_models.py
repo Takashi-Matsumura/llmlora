@@ -69,8 +69,9 @@ class ChatSession(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False, index=True)
-    job_id = Column(Integer, ForeignKey("training_jobs.id"), nullable=False)
-    model_path = Column(String(500), nullable=False)
+    job_id = Column(Integer, ForeignKey("training_jobs.id"), nullable=True)  # Optional for Ollama models
+    model_name = Column(String(255), nullable=True)  # For Ollama models
+    model_path = Column(String(500), nullable=True)  # Optional for Ollama models
     settings = Column(JSON, nullable=True)  # For generation parameters like temperature, max_tokens
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

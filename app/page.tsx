@@ -14,10 +14,10 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>('overview')
 
   const tabs = [
-    { id: 'overview' as Tab, label: '概要', icon: Activity },
-    { id: 'datasets' as Tab, label: 'データセット', icon: Database },
-    { id: 'training' as Tab, label: '訓練', icon: Brain },
-    { id: 'ollama' as Tab, label: 'Ollama統合', icon: Server },
+    { id: 'overview' as Tab, label: 'ダッシュボード', icon: Activity },
+    { id: 'datasets' as Tab, label: 'データセット作成', icon: Database },
+    { id: 'training' as Tab, label: 'LLMトレーニング', icon: Brain },
+    { id: 'ollama' as Tab, label: 'チャットシミュレーション', icon: Server },
   ]
 
   const renderContent = () => {
@@ -32,9 +32,9 @@ export default function Home() {
         return (
           <div className="space-y-6">
             <div className="text-center space-y-4">
-              <h1 className="text-4xl font-bold">LLM LoRA ファインチューニング</h1>
+              <h1 className="text-4xl font-bold">LLM LoRA ファインチューニングApp</h1>
               <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                Ollama統合を使用してLoRA（Low-Rank Adaptation）でローカルLLMをファインチューニング
+                LoRA（Low-Rank Adaptation）を使用したファインチューニング学習
               </p>
             </div>
 
@@ -43,18 +43,18 @@ export default function Home() {
                 <CardHeader>
                   <div className="flex items-center gap-2">
                     <Database className="h-5 w-5" />
-                    <CardTitle>データセット管理</CardTitle>
+                    <CardTitle>データセット作成</CardTitle>
                   </div>
                   <CardDescription>
-                    JSON または CSV 形式で訓練データセットをアップロードして管理
+                    JSON または CSV 形式でファインチューニング用のデータセットを作成・管理
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Button 
                     onClick={() => setActiveTab('datasets')}
-                    className="w-full"
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white border border-blue-600 hover:border-blue-700 transition-colors"
                   >
-                    データセットを管理
+                    データセットを作成
                   </Button>
                 </CardContent>
               </Card>
@@ -63,18 +63,18 @@ export default function Home() {
                 <CardHeader>
                   <div className="flex items-center gap-2">
                     <Brain className="h-5 w-5" />
-                    <CardTitle>LoRA訓練</CardTitle>
+                    <CardTitle>LLMトレーニング</CardTitle>
                   </div>
                   <CardDescription>
-                    モデルでLoRAファインチューニングジョブを設定して開始
+                    ローカルLLMでLoRAファインチューニングジョブを作成・実行
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Button 
                     onClick={() => setActiveTab('training')}
-                    className="w-full"
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white border border-blue-600 hover:border-blue-700 transition-colors"
                   >
-                    訓練を開始
+                    トレーニングを開始
                   </Button>
                 </CardContent>
               </Card>
@@ -83,18 +83,18 @@ export default function Home() {
                 <CardHeader>
                   <div className="flex items-center gap-2">
                     <Server className="h-5 w-5" />
-                    <CardTitle>Ollama統合</CardTitle>
+                    <CardTitle>チャットシミュレーション</CardTitle>
                   </div>
                   <CardDescription>
-                    Ollamaを通してローカルLLMとシームレスに連携
+                    ファインチューニング済みモデルとオリジナルモデルでチャットシミュレーション
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Button 
                     onClick={() => setActiveTab('ollama')}
-                    className="w-full"
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white border border-blue-600 hover:border-blue-700 transition-colors"
                   >
-                    チャットを開始
+                    シミュレーションを開始
                   </Button>
                 </CardContent>
               </Card>
@@ -103,29 +103,29 @@ export default function Home() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>機能</CardTitle>
+                  <CardTitle>主要機能</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-2 text-sm">
                     <li className="flex items-center gap-2">
                       <span className="h-2 w-2 bg-green-500 rounded-full"></span>
-                      LoRAによるパラメータ効率的ファインチューニング（PEFT）
+                      LoRAファインチューニングプラットフォーム
                     </li>
                     <li className="flex items-center gap-2">
                       <span className="h-2 w-2 bg-green-500 rounded-full"></span>
-                      OllamaによるローカルLLMサポート
+                      データセット作成・管理機能
                     </li>
                     <li className="flex items-center gap-2">
                       <span className="h-2 w-2 bg-green-500 rounded-full"></span>
-                      リアルタイム訓練進捗監視
+                      リアルタイムトレーニング進捗監視
                     </li>
                     <li className="flex items-center gap-2">
                       <span className="h-2 w-2 bg-green-500 rounded-full"></span>
-                      Dockerコンテナ化環境
+                      チャットシミュレーション機能
                     </li>
                     <li className="flex items-center gap-2">
                       <span className="h-2 w-2 bg-green-500 rounded-full"></span>
-                      Webベース設定インターフェース
+                      Ollama統合でローカルLLMサポート
                     </li>
                   </ul>
                 </CardContent>
@@ -133,25 +133,25 @@ export default function Home() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>使用開始方法</CardTitle>
+                  <CardTitle>使用手順</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ol className="space-y-2 text-sm">
                     <li className="flex items-start gap-2">
-                      <span className="flex-shrink-0 w-5 h-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-medium">1</span>
-                      <span>データセットタブで訓練データセットをアップロード</span>
+                      <span className="flex-shrink-0 w-5 h-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-medium">1</span>
+                      <span>データセット作成でファインチューニング用データをアップロード</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="flex-shrink-0 w-5 h-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-medium">2</span>
-                      <span>訓練タブでLoRAパラメータを設定</span>
+                      <span className="flex-shrink-0 w-5 h-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-medium">2</span>
+                      <span>LLMトレーニングでLoRAパラメータを設定しトレーニングを実行</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="flex-shrink-0 w-5 h-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-medium">3</span>
-                      <span>ベースモデルを選択して訓練を開始</span>
+                      <span className="flex-shrink-0 w-5 h-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-medium">3</span>
+                      <span>リアルタイムでトレーニング進捗を監視・管理</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="flex-shrink-0 w-5 h-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-medium">4</span>
-                      <span>進捗を監視してファインチューニング済みモデルをダウンロード</span>
+                      <span className="flex-shrink-0 w-5 h-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-medium">4</span>
+                      <span>チャットシミュレーションでファインチューニング済みモデルをテスト</span>
                     </li>
                   </ol>
                 </CardContent>

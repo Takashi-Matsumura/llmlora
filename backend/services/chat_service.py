@@ -6,7 +6,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, insert
+from sqlalchemy import select, insert, text
 from datetime import datetime
 
 from database.database import AsyncSessionLocal
@@ -21,21 +21,38 @@ class ChatService:
     async def create_session(self, session_data: ChatSessionCreate) -> ChatSessionResponse:
         """Create a new chat session"""
         async with AsyncSessionLocal() as db:
-            # Get training job to verify it exists and is completed
-            result = await db.execute(select(TrainingJob).where(TrainingJob.id == session_data.job_id))
-            job = result.scalar_one_or_none()
+            model_path = None
             
-            if not job:
-                raise ValueError(f"Training job {session_data.job_id} not found")
+            # Handle fine-tuned model (training job)
+            if session_data.job_id:
+                result = await db.execute(select(TrainingJob).where(TrainingJob.id == session_data.job_id))
+                job = result.scalar_one_or_none()
+                
+                if not job:
+                    raise ValueError(f"Training job {session_data.job_id} not found")
+                
+                if not job.model_path:
+                    raise ValueError(f"Training job {session_data.job_id} has no model path")
+                
+                model_path = job.model_path
             
-            if not job.model_path:
-                raise ValueError(f"Training job {session_data.job_id} has no model path")
+            # Handle Ollama model
+            elif session_data.model_name:
+                # Verify Ollama model exists
+                from services.ollama_service import OllamaService
+                async with OllamaService() as ollama:
+                    if not await ollama.check_model_exists(session_data.model_name):
+                        raise ValueError(f"Ollama model {session_data.model_name} not found")
+            
+            else:
+                raise ValueError("Either job_id or model_name must be provided")
             
             # Create chat session
             new_session = ChatSession(
                 name=session_data.name,
                 job_id=session_data.job_id,
-                model_path=job.model_path,
+                model_name=session_data.model_name,
+                model_path=model_path,
                 settings=session_data.settings or {}
             )
             
@@ -47,6 +64,7 @@ class ChatService:
                 id=new_session.id,
                 name=new_session.name,
                 job_id=new_session.job_id,
+                model_name=new_session.model_name,
                 model_path=new_session.model_path,
                 settings=new_session.settings,
                 created_at=new_session.created_at,
@@ -64,6 +82,7 @@ class ChatService:
                     id=session.id,
                     name=session.name,
                     job_id=session.job_id,
+                    model_name=session.model_name,
                     model_path=session.model_path,
                     settings=session.settings,
                     created_at=session.created_at,
@@ -114,14 +133,22 @@ class ChatService:
             await db.refresh(user_message)
             
             try:
-                # Load model and generate response
-                response_text = await self._generate_with_model(
-                    session.model_path,
-                    session.job_id,
-                    request.message,
-                    temperature=request.temperature,
-                    max_tokens=request.max_tokens
-                )
+                # Generate response based on session type
+                if session.model_name:  # Ollama model
+                    response_text = await self._generate_with_ollama(
+                        session.model_name,
+                        request.message,
+                        temperature=request.temperature,
+                        max_tokens=request.max_tokens
+                    )
+                else:  # Fine-tuned model
+                    response_text = await self._generate_with_model(
+                        session.model_path,
+                        session.job_id,
+                        request.message,
+                        temperature=request.temperature,
+                        max_tokens=request.max_tokens
+                    )
                 
                 # Save assistant message
                 assistant_message = ChatMessage(
@@ -141,7 +168,21 @@ class ChatService:
                 
             except Exception as e:
                 logger.error(f"Error generating response: {e}")
-                raise ValueError(f"Failed to generate response: {e}")
+                # Save error message for user
+                error_message = ChatMessage(
+                    session_id=request.session_id,
+                    role=ChatMessageRole.ASSISTANT,
+                    content="エラーが発生しました。"
+                )
+                db.add(error_message)
+                await db.commit()
+                await db.refresh(error_message)
+                
+                return ChatGenerateResponse(
+                    message_id=error_message.id,
+                    response="エラーが発生しました。",
+                    session_id=request.session_id
+                )
     
     async def _generate_with_model(
         self, 
@@ -315,18 +356,71 @@ class ChatService:
             logger.error(f"Error loading model: {e}")
             raise
     
+    async def _generate_with_ollama(
+        self,
+        model_name: str,
+        prompt: str,
+        temperature: float = 0.7,
+        max_tokens: int = 512
+    ) -> str:
+        """Generate response using Ollama model"""
+        try:
+            logger.info(f"Generating with Ollama model: {model_name} for prompt: '{prompt[:50]}...'")
+            
+            from services.ollama_service import OllamaService
+            
+            async with OllamaService() as ollama:
+                response = await ollama.generate(
+                    model_name=model_name,
+                    prompt=prompt,
+                    options={
+                        "temperature": temperature,
+                        "num_predict": max_tokens,
+                        "stop": ["User:", "Human:", "\n\nUser:", "\n\nHuman:"]
+                    }
+                )
+                
+                generated_text = response.get("response", "").strip()
+                logger.info(f"Ollama response: '{generated_text}'")
+                
+                if not generated_text:
+                    return "申し訳ございませんが、応答を生成できませんでした。"
+                
+                return generated_text
+                
+        except Exception as e:
+            logger.error(f"Error generating with Ollama: {e}")
+            return "Ollamaでの生成中にエラーが発生しました。"
+    
     async def delete_session(self, session_id: int):
         """Delete a chat session and its messages"""
         async with AsyncSessionLocal() as db:
-            # Delete messages first
-            await db.execute(
-                select(ChatMessage).where(ChatMessage.session_id == session_id)
-            )
-            
-            # Delete session
-            result = await db.execute(select(ChatSession).where(ChatSession.id == session_id))
-            session = result.scalar_one_or_none()
-            
-            if session:
-                await db.delete(session)
+            try:
+                # Check if session exists
+                result = await db.execute(select(ChatSession).where(ChatSession.id == session_id))
+                session = result.scalar_one_or_none()
+                
+                if not session:
+                    raise ValueError(f"Chat session {session_id} not found")
+                
+                # Use raw SQL to delete messages first
+                await db.execute(text("DELETE FROM chat_messages WHERE session_id = :session_id"), 
+                                {"session_id": session_id})
+                
+                # Then delete the session using raw SQL
+                await db.execute(text("DELETE FROM chat_sessions WHERE id = :session_id"), 
+                                {"session_id": session_id})
+                
+                # Commit all changes
                 await db.commit()
+                logger.info(f"Successfully deleted chat session {session_id} using raw SQL")
+                
+            except ValueError:
+                await db.rollback()
+                raise
+            except Exception as e:
+                await db.rollback()
+                logger.error(f"Error deleting session {session_id}: {e}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                raise
