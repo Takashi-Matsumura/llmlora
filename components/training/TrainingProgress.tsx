@@ -82,8 +82,8 @@ export function TrainingProgress({ job }: TrainingProgressProps) {
     // Set up interval with adaptive frequency based on job status
     let interval
     if (job.status === 'running') {
-      // More frequent polling during training
-      interval = Math.min(2000 * Math.pow(1.1, retryCount), 5000) // 2s, 2.2s, 2.4s, ... 5s max during training
+      // More frequent polling during training for real-time updates
+      interval = Math.min(1000 * Math.pow(1.1, retryCount), 3000) // 1s, 1.1s, 1.2s, ... 3s max during training
     } else {
       // Less frequent for other states
       interval = Math.min(5000 * Math.pow(1.2, retryCount), 15000) // 5s, 6s, 7.2s, ... 15s max

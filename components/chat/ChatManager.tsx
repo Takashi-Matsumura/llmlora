@@ -84,7 +84,8 @@ export function ChatManager() {
         setSelectedSession(newSession)
         setShowNewSessionDialog(false)
       } else {
-        console.error('Failed to create session')
+        const errorText = await response.text()
+        console.error('Failed to create session:', response.status, errorText)
       }
     } catch (error) {
       console.error('Error creating session:', error)

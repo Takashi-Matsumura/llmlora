@@ -94,13 +94,59 @@ class TrainingService:
             job.error_message = "モデルファイルをロード中..."
             await db.commit()
             
-            model = AutoModelForCausalLM.from_pretrained(
-                model_name,
-                cache_dir=self.model_cache_dir,
-                device_map="auto" if device == "cuda" else None,
-                torch_dtype=dtype,
-                trust_remote_code=True
-            )
+            # Special memory-efficient loading for large models like Gemma2-2B
+            if "gemma-2-2b" in model_name:
+                logger.info("Loading model with memory optimizations for Gemma2-2B")
+                
+                # Try QLoRA if GPU is available, otherwise use CPU optimizations
+                if device == "cuda":
+                    try:
+                        from transformers import BitsAndBytesConfig
+                        bnb_config = BitsAndBytesConfig(
+                            load_in_4bit=True,
+                            bnb_4bit_use_double_quant=True,
+                            bnb_4bit_quant_type="nf4",
+                            bnb_4bit_compute_dtype=torch.float16,
+                        )
+                        logger.info("Using QLoRA (4-bit quantization) for GPU")
+                        model = AutoModelForCausalLM.from_pretrained(
+                            model_name,
+                            cache_dir=self.model_cache_dir,
+                            device_map="auto",
+                            quantization_config=bnb_config,
+                            trust_remote_code=True,
+                            token=os.environ.get('HF_TOKEN')
+                        )
+                    except Exception as e:
+                        logger.warning(f"QLoRA failed, falling back to standard loading: {e}")
+                        model = AutoModelForCausalLM.from_pretrained(
+                            model_name,
+                            cache_dir=self.model_cache_dir,
+                            device_map="auto",
+                            torch_dtype=torch.float16,
+                            trust_remote_code=True,
+                            token=os.environ.get('HF_TOKEN')
+                        )
+                else:
+                    # CPU optimizations
+                    logger.info("Using CPU optimizations (no quantization)")
+                    model = AutoModelForCausalLM.from_pretrained(
+                        model_name,
+                        cache_dir=self.model_cache_dir,
+                        torch_dtype=torch.float32,
+                        trust_remote_code=True,
+                        low_cpu_mem_usage=True,
+                        use_cache=False,
+                        token=os.environ.get('HF_TOKEN')
+                    )
+            else:
+                model = AutoModelForCausalLM.from_pretrained(
+                    model_name,
+                    cache_dir=self.model_cache_dir,
+                    device_map="auto" if device == "cuda" else None,
+                    torch_dtype=dtype,
+                    trust_remote_code=True
+                )
             logger.info("Model loaded successfully")
             
             # Move model to appropriate device if not using device_map
@@ -109,13 +155,28 @@ class TrainingService:
 
             # Prepare LoRA configuration with appropriate target modules
             target_modules = self._get_target_modules(model_name, job.lora_config.get("target_modules", []))
-            lora_config = LoraConfig(
-                task_type=TaskType.CAUSAL_LM,
-                r=job.lora_config["r"],
-                lora_alpha=job.lora_config["alpha"],
-                lora_dropout=job.lora_config["dropout"],
-                target_modules=target_modules,
-            )
+            
+            # Special handling for Gemma2 models
+            if "gemma-2-2b" in model_name:
+                logger.info(f"Using Gemma2-specific LoRA config with modules: {target_modules}")
+                lora_config = LoraConfig(
+                    task_type=TaskType.CAUSAL_LM,
+                    r=job.lora_config["r"],
+                    lora_alpha=job.lora_config["alpha"],
+                    lora_dropout=job.lora_config["dropout"],
+                    target_modules=target_modules,
+                    bias="none",  # Important for Gemma2
+                    fan_in_fan_out=False,  # Important for Gemma2
+                    inference_mode=False,  # Ensure training mode
+                )
+            else:
+                lora_config = LoraConfig(
+                    task_type=TaskType.CAUSAL_LM,
+                    r=job.lora_config["r"],
+                    lora_alpha=job.lora_config["alpha"],
+                    lora_dropout=job.lora_config["dropout"],
+                    target_modules=target_modules,
+                )
 
             # Apply LoRA to model
             logger.info("Applying LoRA configuration...")
@@ -124,6 +185,13 @@ class TrainingService:
             
             model = get_peft_model(model, lora_config)
             model.print_trainable_parameters()
+            
+            # Ensure model is in training mode and requires gradients
+            model.train()
+            for param in model.parameters():
+                if param.requires_grad:
+                    param.requires_grad_(True)
+            
             logger.info("LoRA configuration applied successfully")
 
             # Prepare dataset
@@ -134,25 +202,38 @@ class TrainingService:
             train_dataset = self._prepare_dataset(dataset.data, tokenizer, job.training_config["max_length"])
             logger.info(f"Dataset prepared with {len(train_dataset)} samples")
 
-            # Training arguments with more frequent logging
+            # Memory-optimized training arguments for large models
+            batch_size = 1 if "gemma-2-2b" in model_name else job.training_config["batch_size"]
+            grad_accum = 8 if "gemma-2-2b" in model_name else job.training_config["gradient_accumulation_steps"]
+            
             training_args = TrainingArguments(
                 output_dir=str(job_output_dir),
                 num_train_epochs=job.training_config["num_epochs"],
-                per_device_train_batch_size=job.training_config["batch_size"],
-                gradient_accumulation_steps=job.training_config["gradient_accumulation_steps"],
+                per_device_train_batch_size=batch_size,  # Reduce for large models
+                gradient_accumulation_steps=grad_accum,  # Increase for large models
                 warmup_ratio=job.training_config["warmup_ratio"],
                 learning_rate=job.training_config["learning_rate"],
                 weight_decay=job.training_config["weight_decay"],
                 logging_steps=1,  # Log every step for real-time updates
                 save_steps=job.training_config["save_steps"],
-                save_total_limit=3,
+                save_total_limit=2,  # Reduce to save disk space
                 remove_unused_columns=False,
-                dataloader_pin_memory=False,
+                dataloader_pin_memory=False,  # Disable for memory efficiency
+                dataloader_num_workers=0,  # Single threaded to reduce memory
                 report_to=None,
+                # Gradient and optimization flags
+                gradient_checkpointing=False if "gemma-2-2b" in model_name else True,  # Disable for Gemma2 to fix gradient issues
+                optim="adamw_torch",  # More memory efficient optimizer
+                fp16=False,  # Use float32 for CPU stability
                 no_cuda=True if device == "cpu" else False,
                 use_cpu=True if device == "cpu" else False,
                 logging_strategy="steps",
-                evaluation_strategy="no",
+                eval_strategy="no",  # Updated parameter name
+                # Gradient specific settings for Gemma2
+                max_grad_norm=1.0,  # Gradient clipping
+                adam_beta1=0.9,
+                adam_beta2=0.999,
+                adam_epsilon=1e-8,
             )
 
             # Data collator
@@ -204,20 +285,30 @@ class TrainingService:
         """Resolve Ollama model name to HuggingFace model name"""
         # Map common Ollama models to HuggingFace equivalents
         model_mapping = {
-            # Using smaller models for faster training on MacBook Air M4
-            "llama2": "microsoft/DialoGPT-medium",  # Stable and fast
-            "llama2:7b": "microsoft/DialoGPT-medium",  # Stable and fast
-            "llama2:13b": "microsoft/DialoGPT-medium",  # Stable and fast
-            "gemma": "microsoft/DialoGPT-medium",  # Stable and fast
-            "gemma:7b": "microsoft/DialoGPT-medium",  # Stable and fast
-            "mistral": "microsoft/DialoGPT-medium",  # Stable and fast
-            "codellama": "microsoft/DialoGPT-medium",  # Stable and fast
+            # Use publicly available models for stable training
+            "gemma2:2b": "google/gemma-2-2b",  # Actual Gemma2 2B model (requires HF token)
+            "gemma": "rinna/japanese-gpt-neox-3.6b",  # Default to Japanese model
+            "gemma:7b": "rinna/japanese-gpt-neox-3.6b",
             
-            # Japanese models (for future use when stable)
+            # Alternative: Use smaller public models
+            "llama2": "microsoft/DialoGPT-medium",  # Stable and fast
+            "llama2:7b": "microsoft/DialoGPT-medium",  
+            "llama2:13b": "microsoft/DialoGPT-medium",
+            
+            # Other models
+            "mistral": "microsoft/DialoGPT-medium",  # Fallback to stable model
+            "codellama": "microsoft/DialoGPT-medium",
+            
+            # Japanese models
             "japanese": "rinna/japanese-gpt-neox-3.6b",  # Japanese specialized model
+            "rinna-1b": "rinna/japanese-gpt-1b",  # Lightweight Japanese model (recommended)
+            "gemma-3n": "google/gemma-2-2b",  # Gemma 3B model (mapped to available Gemma2-2B)
+            
+            # Fallback
+            "fallback": "microsoft/DialoGPT-medium",
         }
         
-        return model_mapping.get(model_name, "microsoft/DialoGPT-medium")
+        return model_mapping.get(model_name, "rinna/japanese-gpt-neox-3.6b")
 
     def _get_target_modules(self, model_name: str, requested_modules: list) -> list:
         """Get appropriate target modules for the given model"""
@@ -228,11 +319,15 @@ class TrainingService:
             
             # Japanese models (GPT-NeoX architecture)
             "rinna/japanese-gpt-neox": ["query_key_value", "dense"],
+            "rinna/japanese-gpt-1b": ["c_attn", "c_proj"],  # GPT-2 architecture
             "cyberagent/open-calm": ["query_key_value", "dense"],
             
             # LLaMA based models
             "meta-llama": ["q_proj", "v_proj", "k_proj", "o_proj"],
             "mistralai": ["q_proj", "v_proj", "k_proj", "o_proj"],
+            
+            # Gemma models (specific architecture)
+            "google/gemma-2": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
             "google/gemma": ["q_proj", "v_proj", "k_proj", "o_proj"],
         }
         
@@ -349,8 +444,12 @@ class TrainerWithProgress(Trainer):
                     
                     new_session.add(metric)
                     
-                    # Update job progress
-                    progress = (logs["epoch"] / self.args.num_train_epochs) * 100
+                    # Update job progress - use step-based calculation for more frequent updates
+                    if self.state.max_steps > 0:
+                        progress = (self.state.global_step / self.state.max_steps) * 100
+                    else:
+                        # Fallback to epoch-based calculation
+                        progress = (logs["epoch"] / self.args.num_train_epochs) * 100
                     await new_session.execute(
                         update(TrainingJob)
                         .where(TrainingJob.id == self.job_id)
@@ -364,7 +463,7 @@ class TrainerWithProgress(Trainer):
                     )
                     
                     await new_session.commit()
-                    logger.info(f"Progress updated: {progress:.1f}% (Epoch {int(logs['epoch'])}, Step {self.state.global_step})")
+                    logger.info(f"Progress updated: {progress:.1f}% (Epoch {int(logs['epoch'])}/{self.args.num_train_epochs}, Step {self.state.global_step}/{self.state.max_steps}, Loss: {logs['loss']:.4f})")
                 
         except Exception as e:
             logger.error(f"Failed to save metrics: {e}")

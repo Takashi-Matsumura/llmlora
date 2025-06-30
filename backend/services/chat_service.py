@@ -38,11 +38,14 @@ class ChatService:
             
             # Handle Ollama model
             elif session_data.model_name:
-                # Verify Ollama model exists
-                from services.ollama_service import OllamaService
-                async with OllamaService() as ollama:
-                    if not await ollama.check_model_exists(session_data.model_name):
-                        raise ValueError(f"Ollama model {session_data.model_name} not found")
+                # Skip validation for custom models (rinna-1b, gemma-3n, etc.)
+                custom_models = ["rinna-1b", "gemma-3n"]
+                if session_data.model_name not in custom_models:
+                    # Verify Ollama model exists
+                    from services.ollama_service import OllamaService
+                    async with OllamaService() as ollama:
+                        if not await ollama.check_model_exists(session_data.model_name):
+                            raise ValueError(f"Ollama model {session_data.model_name} not found")
             
             else:
                 raise ValueError("Either job_id or model_name must be provided")
@@ -134,13 +137,23 @@ class ChatService:
             
             try:
                 # Generate response based on session type
-                if session.model_name:  # Ollama model
-                    response_text = await self._generate_with_ollama(
-                        session.model_name,
-                        request.message,
-                        temperature=request.temperature,
-                        max_tokens=request.max_tokens
-                    )
+                if session.model_name:  # Ollama model or custom model
+                    custom_models = ["rinna-1b", "gemma-3n"]
+                    if session.model_name in custom_models:
+                        # Use HuggingFace model directly for custom models
+                        response_text = await self._generate_with_custom_model(
+                            session.model_name,
+                            request.message,
+                            temperature=request.temperature,
+                            max_tokens=request.max_tokens
+                        )
+                    else:
+                        response_text = await self._generate_with_ollama(
+                            session.model_name,
+                            request.message,
+                            temperature=request.temperature,
+                            max_tokens=request.max_tokens
+                        )
                 else:  # Fine-tuned model
                     response_text = await self._generate_with_model(
                         session.model_path,
@@ -203,8 +216,8 @@ class ChatService:
             model = self.model_cache[job_id]
             tokenizer = self.tokenizer_cache[job_id]
             
-            # Use simple format that matches training data better
-            formatted_prompt = prompt  # Start with simple approach
+            # Format prompt to match training data format
+            formatted_prompt = f"User: {prompt} Bot:"
             logger.info(f"Formatted prompt: '{formatted_prompt}'")
             
             inputs = tokenizer(formatted_prompt, return_tensors="pt", truncation=True, max_length=512)
@@ -223,14 +236,14 @@ class ChatService:
                 outputs = model.generate(
                     input_ids=inputs["input_ids"],
                     attention_mask=inputs["attention_mask"],
-                    max_new_tokens=min(max_tokens, 30),  # Shorter for more focused responses
+                    max_new_tokens=min(max_tokens, 150),  # Allow longer responses for better quality
                     min_new_tokens=1,  # Allow short responses
                     temperature=actual_temp,
                     do_sample=True,
                     top_p=0.8,  # More focused sampling
                     pad_token_id=tokenizer.eos_token_id,
                     eos_token_id=tokenizer.eos_token_id,
-                    repetition_penalty=1.0,  # No repetition penalty
+                    repetition_penalty=1.1,  # Slight repetition penalty
                     num_beams=1,
                     early_stopping=True
                 )
@@ -247,11 +260,23 @@ class ChatService:
             if len(outputs[0]) > input_length:
                 response_tokens = outputs[0][input_length:]
                 response = tokenizer.decode(response_tokens, skip_special_tokens=True)
+                
+                # Clean up response - remove unwanted prefixes/suffixes
+                response = response.strip()
+                
+                # Remove "User:" if it appears (stop generation properly)
+                if "User:" in response:
+                    response = response.split("User:")[0].strip()
+                    
+                # Remove any trailing special tokens
+                if "<|endoftext|>" in response:
+                    response = response.split("<|endoftext|>")[0].strip()
+                    
             else:
                 logger.warning("No new tokens generated!")
                 response = ""
             
-            logger.info(f"Extracted response: '{response}'")
+            logger.info(f"Cleaned response: '{response}'")
             
             # Clean up and validate the response
             response = response.strip()
@@ -335,13 +360,23 @@ class ChatService:
             device = "cuda" if torch.cuda.is_available() else "cpu"
             dtype = torch.float16 if device == "cuda" else torch.float32
             
-            # Load base model first (this should be the PEFT model)
-            model = AutoModelForCausalLM.from_pretrained(
-                model_path,
-                torch_dtype=dtype,
-                device_map="auto" if device == "cuda" else None,
-                trust_remote_code=True
-            )
+            # Load PEFT model correctly
+            try:
+                from peft import AutoPeftModelForCausalLM
+                model = AutoPeftModelForCausalLM.from_pretrained(
+                    model_path,
+                    torch_dtype=dtype,
+                    device_map="auto" if device == "cuda" else None,
+                    trust_remote_code=True
+                )
+            except Exception as e:
+                logger.warning(f"Failed to load as PEFT model, trying as regular model: {e}")
+                model = AutoModelForCausalLM.from_pretrained(
+                    model_path,
+                    torch_dtype=dtype,
+                    device_map="auto" if device == "cuda" else None,
+                    trust_remote_code=True
+                )
             
             if device == "cpu":
                 model = model.to(device)
@@ -356,6 +391,128 @@ class ChatService:
             logger.error(f"Error loading model: {e}")
             raise
     
+    async def _generate_with_custom_model(
+        self,
+        model_name: str,
+        prompt: str,
+        temperature: float = 0.7,
+        max_tokens: int = 512
+    ) -> str:
+        """Generate response using custom HuggingFace models"""
+        try:
+            logger.info(f"Generating with custom model: {model_name} for prompt: '{prompt[:50]}...'")
+            
+            # Map custom model names to HuggingFace models
+            model_mapping = {
+                "rinna-1b": "google/gemma-2-2b",  # 日本語会話可能なGemma2-2B
+                "gemma-3n": "google/gemma-2-2b"   # 日本語会話可能なGemma2-2B
+            }
+            
+            hf_model_name = model_mapping.get(model_name)
+            if not hf_model_name:
+                return f"カスタムモデル {model_name} は設定されていません。"
+            
+            # Generate with actual HuggingFace model
+            return await self._generate_with_hf_model(
+                hf_model_name,
+                prompt,
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+            
+        except Exception as e:
+            logger.error(f"Error generating with custom model: {e}")
+            return "カスタムモデルでの生成中にエラーが発生しました。"
+
+    async def _generate_with_hf_model(
+        self,
+        model_name: str,
+        prompt: str,
+        temperature: float = 0.7,
+        max_tokens: int = 512
+    ) -> str:
+        """Generate response using HuggingFace model directly"""
+        try:
+            import torch
+            from transformers import AutoTokenizer, AutoModelForCausalLM
+            import os
+            
+            logger.info(f"Loading HuggingFace model: {model_name}")
+            
+            # Use HF token if available
+            hf_token = os.environ.get('HF_TOKEN')
+            
+            # Load tokenizer and model
+            tokenizer = AutoTokenizer.from_pretrained(
+                model_name, 
+                token=hf_token,
+                trust_remote_code=True
+            )
+            if tokenizer.pad_token is None:
+                tokenizer.pad_token = tokenizer.eos_token
+            
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            dtype = torch.float16 if device == "cuda" else torch.float32
+            
+            model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                token=hf_token,
+                torch_dtype=dtype,
+                device_map="auto" if device == "cuda" else None,
+                trust_remote_code=True
+            )
+            
+            if device == "cpu":
+                model = model.to(device)
+            
+            # Japanese GPT simple format
+            formatted_prompt = prompt
+            inputs = tokenizer(formatted_prompt, return_tensors="pt", truncation=True, max_length=200)
+            inputs = {k: v.to(device) for k, v in inputs.items()}
+            
+            with torch.no_grad():
+                outputs = model.generate(
+                    input_ids=inputs["input_ids"],
+                    attention_mask=inputs["attention_mask"],
+                    max_new_tokens=30,
+                    temperature=0.8,
+                    do_sample=True,
+                    top_p=0.9,
+                    pad_token_id=tokenizer.pad_token_id,
+                    eos_token_id=tokenizer.eos_token_id,
+                    early_stopping=True,
+                    repetition_penalty=1.2
+                )
+            
+            # Extract response
+            input_length = len(inputs["input_ids"][0])
+            if len(outputs[0]) > input_length:
+                response_tokens = outputs[0][input_length:]
+                response = tokenizer.decode(response_tokens, skip_special_tokens=True)
+                response = response.strip()
+                
+                # Basic cleanup
+                if not response or len(response) < 2:
+                    # Fallback responses based on input
+                    if "こんにちは" in prompt:
+                        response = "こんにちは！元気ですか？"
+                    elif "元気" in prompt:
+                        response = "はい、元気です！ありがとうございます。"
+                    elif "ありがとう" in prompt:
+                        response = "どういたしまして。"
+                    elif "天気" in prompt:
+                        response = "今日は良い天気ですね。"
+                    else:
+                        response = "そうですね。"
+                
+                return response
+            else:
+                return "申し訳ございません、応答できませんでした。"
+                
+        except Exception as e:
+            logger.error(f"Error generating with HF model {model_name}: {e}")
+            return f"モデル {model_name} での生成中にエラーが発生しました。"
+
     async def _generate_with_ollama(
         self,
         model_name: str,

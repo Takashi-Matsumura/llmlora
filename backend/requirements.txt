@@ -5,13 +5,13 @@ python-multipart==0.0.6
 
 # Machine Learning
 torch==2.1.1
-transformers==4.36.0
+transformers==4.45.0
 peft==0.7.1
 datasets==2.15.0
-accelerate==0.25.0
+accelerate==1.8.1
 bitsandbytes==0.41.3
 sentencepiece==0.1.99
-protobuf==4.25.1
+protobuf==3.20.3
 
 # Database
 sqlalchemy==2.0.23

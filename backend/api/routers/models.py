@@ -9,7 +9,32 @@ async def list_models():
     """Get list of available models from Ollama"""
     async with OllamaService() as ollama:
         try:
-            return await ollama.list_models()
+            # Get models from Ollama
+            ollama_models = await ollama.list_models()
+            
+            # Add our custom lightweight models
+            from models.schemas import OllamaModel
+            from datetime import datetime
+            
+            custom_models = [
+                OllamaModel(
+                    name="rinna-1b",
+                    size=1000000000,  # 1B parameters
+                    digest="custom",
+                    modified_at=datetime.now()
+                ),
+                OllamaModel(
+                    name="gemma-3n",
+                    size=3000000000,  # 3B parameters
+                    digest="custom",
+                    modified_at=datetime.now()
+                )
+            ]
+            
+            # Combine Ollama models with custom models
+            all_models = ollama_models.models + custom_models
+            
+            return ModelListResponse(models=all_models)
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 

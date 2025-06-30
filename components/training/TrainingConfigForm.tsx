@@ -23,10 +23,10 @@ export function TrainingConfigForm({ config, onChange }: TrainingConfigFormProps
       <CardHeader>
         <div className="flex items-center gap-2">
           <Cog className="h-5 w-5" />
-          <CardTitle>訓練設定</CardTitle>
+          <CardTitle>トレーニング設定</CardTitle>
         </div>
         <CardDescription>
-          最適な性能のための訓練ハイパーパラメータを設定
+          最適な性能のためのトレーニングハイパーパラメータを設定
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -73,14 +73,14 @@ export function TrainingConfigForm({ config, onChange }: TrainingConfigFormProps
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            訓練データセットを完全に通す回数。
+            トレーニングデータセットを完全に通す回数。
           </p>
         </div>
 
         {/* Batch Size */}
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Label htmlFor="batch-size">Batch Size</Label>
+            <Label htmlFor="batch-size">バッチサイズ</Label>
             <Info className="h-4 w-4 text-muted-foreground" />
           </div>
           <div className="space-y-2">
@@ -95,19 +95,19 @@ export function TrainingConfigForm({ config, onChange }: TrainingConfigFormProps
             />
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>1</span>
-              <span>Current: {config.batch_size}</span>
+              <span>現在: {config.batch_size}</span>
               <span>128</span>
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            Number of samples processed before updating model parameters. Higher = more stable gradients, more memory.
+            モデルパラメータを更新する前に処理するサンプル数。高い値 = より安定した勾配、より多くのメモリ。
           </p>
         </div>
 
         {/* Max Length */}
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Label htmlFor="max-length">Max Sequence Length</Label>
+            <Label htmlFor="max-length">最大シーケンス長</Label>
             <Info className="h-4 w-4 text-muted-foreground" />
           </div>
           <div className="space-y-2">
@@ -122,12 +122,12 @@ export function TrainingConfigForm({ config, onChange }: TrainingConfigFormProps
             />
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>64</span>
-              <span>Current: {config.max_length}</span>
+              <span>現在: {config.max_length}</span>
               <span>4096</span>
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            Maximum number of tokens in input sequences. Longer = more context, more memory.
+            入力シーケンスの最大トークン数。長い = より多くの文脈、より多くのメモリ。
           </p>
         </div>
 
@@ -138,7 +138,7 @@ export function TrainingConfigForm({ config, onChange }: TrainingConfigFormProps
           {/* Gradient Accumulation Steps */}
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Label htmlFor="grad-accum">Gradient Accumulation Steps</Label>
+              <Label htmlFor="grad-accum">勾配蓄積ステップ数</Label>
               <Info className="h-4 w-4 text-muted-foreground" />
             </div>
             <Slider
@@ -152,18 +152,18 @@ export function TrainingConfigForm({ config, onChange }: TrainingConfigFormProps
             />
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>1</span>
-              <span>Current: {config.gradient_accumulation_steps}</span>
+              <span>現在: {config.gradient_accumulation_steps}</span>
               <span>32</span>
             </div>
             <p className="text-xs text-muted-foreground">
-              Accumulate gradients over multiple mini-batches. Effective batch size = batch_size × gradient_accumulation_steps.
+              複数のミニバッチにわたって勾配を蓄積。実効バッチサイズ = バッチサイズ × 勾配蓄積ステップ数。
             </p>
           </div>
 
           {/* Warmup Ratio */}
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Label htmlFor="warmup-ratio">Warmup Ratio</Label>
+              <Label htmlFor="warmup-ratio">ウォームアップ比率</Label>
               <Info className="h-4 w-4 text-muted-foreground" />
             </div>
             <Slider
@@ -177,18 +177,18 @@ export function TrainingConfigForm({ config, onChange }: TrainingConfigFormProps
             />
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>0.0</span>
-              <span>Current: {config.warmup_ratio.toFixed(2)}</span>
+              <span>現在: {config.warmup_ratio.toFixed(2)}</span>
               <span>1.0</span>
             </div>
             <p className="text-xs text-muted-foreground">
-              Fraction of training steps to warmup learning rate from 0 to target value.
+              学習率を0から目標値までウォームアップするトレーニングステップの割合。
             </p>
           </div>
 
           {/* Weight Decay */}
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Label htmlFor="weight-decay">Weight Decay</Label>
+              <Label htmlFor="weight-decay">重み減衰</Label>
               <Info className="h-4 w-4 text-muted-foreground" />
             </div>
             <Slider
@@ -202,11 +202,11 @@ export function TrainingConfigForm({ config, onChange }: TrainingConfigFormProps
             />
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>0.0</span>
-              <span>Current: {config.weight_decay.toFixed(3)}</span>
+              <span>現在: {config.weight_decay.toFixed(3)}</span>
               <span>1.0</span>
             </div>
             <p className="text-xs text-muted-foreground">
-              L2 regularization coefficient. Helps prevent overfitting.
+              L2正則化係数。過学習の防止に役立ちます。
             </p>
           </div>
         </div>
@@ -226,7 +226,7 @@ export function TrainingConfigForm({ config, onChange }: TrainingConfigFormProps
                 warmup_ratio: 0.1,
                 weight_decay: 0.01
               })}
-              className="p-2 text-sm border rounded hover:bg-accent"
+              className="p-2 text-sm border rounded hover:bg-blue-100 hover:border-blue-300 transition-colors"
             >
               高速テスト
             </button>
@@ -241,7 +241,7 @@ export function TrainingConfigForm({ config, onChange }: TrainingConfigFormProps
                 warmup_ratio: 0.1,
                 weight_decay: 0.01
               })}
-              className="p-2 text-sm border rounded hover:bg-accent"
+              className="p-2 text-sm border rounded hover:bg-blue-100 hover:border-blue-300 transition-colors"
             >
               バランス
             </button>
@@ -256,7 +256,7 @@ export function TrainingConfigForm({ config, onChange }: TrainingConfigFormProps
                 warmup_ratio: 0.15,
                 weight_decay: 0.05
               })}
-              className="p-2 text-sm border rounded hover:bg-accent"
+              className="p-2 text-sm border rounded hover:bg-blue-100 hover:border-blue-300 transition-colors"
             >
               高品質
             </button>
@@ -271,7 +271,7 @@ export function TrainingConfigForm({ config, onChange }: TrainingConfigFormProps
                 warmup_ratio: 0.2,
                 weight_decay: 0.1
               })}
-              className="p-2 text-sm border rounded hover:bg-accent"
+              className="p-2 text-sm border rounded hover:bg-blue-100 hover:border-blue-300 transition-colors"
             >
               最高品質
             </button>
@@ -280,7 +280,7 @@ export function TrainingConfigForm({ config, onChange }: TrainingConfigFormProps
 
         {/* Training Summary */}
         <div className="p-4 bg-muted rounded-lg">
-          <h4 className="font-semibold mb-2">訓練サマリー</h4>
+          <h4 className="font-semibold mb-2">トレーニングサマリー</h4>
           <div className="grid grid-cols-2 gap-2 text-sm">
             <div>学習率: {config.learning_rate}</div>
             <div>エポック: {config.num_epochs}</div>

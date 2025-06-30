@@ -58,7 +58,7 @@ export function LoRAConfigForm({ config, onChange }: LoRAConfigFormProps) {
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            低いランク = パラメータ少、高速訓練、表現力低。高いランク = パラメータ多、性能向上。
+            低いランク = パラメータ少、高速トレーニング、表現力低。高いランク = パラメータ多、性能向上。
           </p>
         </div>
 
@@ -140,28 +140,28 @@ export function LoRAConfigForm({ config, onChange }: LoRAConfigFormProps) {
             <button
               type="button"
               onClick={() => updateConfig({ r: 4, alpha: 8, dropout: 0.1, target_modules: ['q_proj', 'v_proj'] })}
-              className="p-2 text-sm border rounded hover:bg-accent"
+              className="p-2 text-sm border rounded hover:bg-blue-100 hover:border-blue-300 transition-colors"
             >
               保守的 (r=4)
             </button>
             <button
               type="button"
               onClick={() => updateConfig({ r: 8, alpha: 16, dropout: 0.1, target_modules: ['q_proj', 'v_proj'] })}
-              className="p-2 text-sm border rounded hover:bg-accent"
+              className="p-2 text-sm border rounded hover:bg-blue-100 hover:border-blue-300 transition-colors"
             >
               バランス (r=8)
             </button>
             <button
               type="button"
               onClick={() => updateConfig({ r: 16, alpha: 32, dropout: 0.1, target_modules: ['q_proj', 'v_proj', 'k_proj', 'o_proj'] })}
-              className="p-2 text-sm border rounded hover:bg-accent"
+              className="p-2 text-sm border rounded hover:bg-blue-100 hover:border-blue-300 transition-colors"
             >
               性能重視 (r=16)
             </button>
             <button
               type="button"
               onClick={() => updateConfig({ r: 32, alpha: 64, dropout: 0.05, target_modules: ['q_proj', 'v_proj', 'k_proj', 'o_proj', 'gate_proj', 'up_proj', 'down_proj'] })}
-              className="p-2 text-sm border rounded hover:bg-accent"
+              className="p-2 text-sm border rounded hover:bg-blue-100 hover:border-blue-300 transition-colors"
             >
               最大 (r=32)
             </button>
@@ -178,7 +178,7 @@ export function LoRAConfigForm({ config, onChange }: LoRAConfigFormProps) {
             <div>モジュール: {config.target_modules.length}</div>
           </div>
           <div className="mt-2 text-xs text-muted-foreground">
-            推定訓練可能パラメータ: 約{Math.round((config.r * 2 * config.target_modules.length * 4096) / 1000)}K
+            推定トレーニング可能パラメータ: 約{Math.round((config.r * 2 * config.target_modules.length * 4096) / 1000)}K
           </div>
         </div>
       </CardContent>

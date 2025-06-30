@@ -32,14 +32,34 @@ export function TrainingManager() {
   }
 
   const handleDeleteJob = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this training job?')) return
+    const job = trainingJobs.find(j => j.id === id)
+    
+    if (job?.status === 'running') {
+      setError('実行中のトレーニングジョブは削除できません。まずジョブを停止してください。')
+      return
+    }
+    
+    if (!confirm(`トレーニングジョブ "${job?.name || id}" を削除してもよろしいですか？この操作は元に戻せません。`)) return
 
     try {
+      setIsLoading(true)
       await trainingApi.deleteJob(id)
       // Reload the training jobs list to ensure UI is updated
       await loadTrainingJobs()
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to delete job')
+      if (error instanceof Error) {
+        if (error.message.includes('Cannot delete running')) {
+          setError('実行中のトレーニングジョブは削除できません。')
+        } else if (error.message.includes('not found')) {
+          setError('指定されたトレーニングジョブが見つかりません。')
+        } else {
+          setError(`削除に失敗しました: ${error.message}`)
+        }
+      } else {
+        setError('トレーニングジョブの削除に失敗しました。')
+      }
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -74,7 +94,7 @@ export function TrainingManager() {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-2xl font-bold">新しい訓練ジョブ</h2>
+            <h2 className="text-2xl font-bold">新しいトレーニングジョブ</h2>
             <p className="text-muted-foreground">新しいLoRAファインチューニングジョブを設定して開始</p>
           </div>
           <Button variant="outline" onClick={() => setShowForm(false)}>
@@ -98,7 +118,7 @@ export function TrainingManager() {
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-2xl font-bold">LLMトレーニング進捗</h2>
-            <p className="text-muted-foreground">訓練ジョブをリアルタイムで監視</p>
+            <p className="text-muted-foreground">トレーニングジョブをリアルタイムで監視</p>
           </div>
           <Button variant="outline" onClick={() => setSelectedJob(null)}>
             ジョブ一覧に戻る
@@ -156,10 +176,12 @@ export function TrainingManager() {
                   <Button 
                     variant="outline" 
                     size="sm"
+                    disabled={job.status === 'running'}
                     onClick={(e) => {
                       e.stopPropagation()
                       handleDeleteJob(job.id)
                     }}
+                    title={job.status === 'running' ? '実行中のジョブは削除できません' : 'トレーニングジョブを削除'}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -233,13 +255,13 @@ export function TrainingManager() {
           <Card className="border-dashed">
             <CardContent className="flex flex-col items-center justify-center py-12">
               <Play className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">訓練ジョブがありません</h3>
+              <h3 className="text-lg font-semibold mb-2">トレーニングジョブがありません</h3>
               <p className="text-muted-foreground mb-4 text-center">
                 最初のLoRAファインチューニングジョブを開始してください
               </p>
               <Button onClick={() => setShowForm(true)}>
                 <Plus className="h-4 w-4 mr-2" />
-                訓練ジョブを作成
+                トレーニングジョブを作成
               </Button>
             </CardContent>
           </Card>

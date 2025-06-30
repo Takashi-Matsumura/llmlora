@@ -68,12 +68,12 @@ export function ChatSessionList({
 
   return (
     <Card>
-      <CardHeader className="pb-0">
+      <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2">
           <MessageSquare className="h-4 w-4" />
           チャットセッション
         </CardTitle>
-        <div className="pt-3 pb-3 border-b">
+        <div className="pt-3">
           <Button
             size="sm"
             onClick={onCreateSession}
@@ -85,6 +85,7 @@ export function ChatSessionList({
           </Button>
         </div>
       </CardHeader>
+      <div className="border-b mx-6"></div>
       <CardContent className="p-0">
         <div className="space-y-1">
           {sessions.length === 0 ? (

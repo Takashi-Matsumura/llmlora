@@ -53,6 +53,7 @@ services:
       - DATABASE_URL=postgresql://llmlora:llmlora_password@postgres:5432/llmlora
       - OLLAMA_URL=http://ollama:11434
       - PYTHONPATH=/app
+      - HF_TOKEN=${HF_TOKEN}
     depends_on:
       - postgres
       - ollama

@@ -1,13 +1,13 @@
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from typing import List
 
 from database.database import get_db
-from models.database_models import TrainingJob, Dataset
+from models.database_models import TrainingJob, Dataset, TrainingMetrics, ChatSession, ChatMessage
 from models.schemas import (
     TrainingJobCreate, TrainingJobResponse, TrainingStatus, 
-    TrainingProgress, TrainingMetrics
+    TrainingProgress
 )
 from services.training_service import TrainingService
 
@@ -211,10 +211,39 @@ async def delete_training_job(job_id: int, db: AsyncSession = Depends(get_db)):
         if not job:
             raise HTTPException(status_code=404, detail="Training job not found")
         
-        await db.delete(job)
-        await db.commit()
+        # Prevent deletion of running jobs
+        if job.status == TrainingStatus.RUNNING:
+            raise HTTPException(status_code=400, detail="Cannot delete running training job")
         
-        return {"message": "Training job deleted successfully"}
+        # Delete related records first to avoid foreign key constraints
+        try:
+            # Get chat session IDs for this job
+            chat_sessions_result = await db.execute(
+                select(ChatSession.id).where(ChatSession.job_id == job_id)
+            )
+            chat_session_ids = [row[0] for row in chat_sessions_result.fetchall()]
+            
+            # Delete chat messages first (they reference chat_sessions)
+            if chat_session_ids:
+                await db.execute(
+                    delete(ChatMessage).where(ChatMessage.session_id.in_(chat_session_ids))
+                )
+            
+            # Delete chat sessions
+            await db.execute(delete(ChatSession).where(ChatSession.job_id == job_id))
+            
+            # Delete training metrics
+            await db.execute(delete(TrainingMetrics).where(TrainingMetrics.job_id == job_id))
+            
+            # Finally delete the training job
+            await db.delete(job)
+            await db.commit()
+            
+            return {"message": "Training job deleted successfully"}
+        except Exception as cleanup_error:
+            await db.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to delete related data: {str(cleanup_error)}")
+            
     except HTTPException:
         raise
     except Exception as e:

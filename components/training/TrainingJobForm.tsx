@@ -89,7 +89,7 @@ export function TrainingJobForm() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>訓練ジョブを作成</CardTitle>
+          <CardTitle>トレーニングジョブを作成</CardTitle>
           <CardDescription>
             選択したモデルとデータセットで新しいLoRAファインチューニングジョブを開始
           </CardDescription>
@@ -103,7 +103,7 @@ export function TrainingJobForm() {
                   id="job-name"
                   value={jobName}
                   onChange={(e) => setJobName(e.target.value)}
-                  placeholder="私のLoRA訓練ジョブ"
+                  placeholder="私のLoRAトレーニングジョブ"
                   required
                 />
               </div>
@@ -126,7 +126,7 @@ export function TrainingJobForm() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="dataset-select">訓練データセット</Label>
+              <Label htmlFor="dataset-select">トレーニングデータセット</Label>
               <Select value={selectedDataset} onValueChange={setSelectedDataset} required>
                 <SelectTrigger>
                   <SelectValue placeholder="データセットを選択" />
@@ -154,7 +154,7 @@ export function TrainingJobForm() {
               ) : (
                 <>
                   <Play className="h-4 w-4 mr-2" />
-                  訓練を開始
+                  トレーニングを開始
                 </>
               )}
             </Button>
