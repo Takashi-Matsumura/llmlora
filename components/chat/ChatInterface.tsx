@@ -10,19 +10,21 @@ import { MessageBubble } from './MessageBubble'
 interface ChatSession {
   id: number
   name: string
-  job_id: number
-  model_path: string
+  job_id?: number
+  model_name?: string
+  model_path?: string
   settings: any
   created_at: string
   updated_at: string
 }
 
 interface ChatMessage {
-  id: number
+  id?: number
   session_id: number
   role: 'user' | 'assistant'
   content: string
   timestamp: string
+  generation_time?: number // in milliseconds
 }
 
 interface ChatInterfaceProps {
@@ -36,6 +38,7 @@ export function ChatInterface({ session }: ChatInterfaceProps) {
   const [loadingMessages, setLoadingMessages] = useState(true)
   const [customTemperature, setCustomTemperature] = useState(0.7)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messageInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     loadMessages()
@@ -72,8 +75,18 @@ export function ChatInterface({ session }: ChatInterfaceProps) {
     }
 
     const messageText = newMessage.trim()
+    const sendTime = new Date()
     setNewMessage('')
     setIsLoading(true)
+
+    // Immediately add user message to UI
+    const userMessage: ChatMessage = {
+      session_id: session.id,
+      role: 'user',
+      content: messageText,
+      timestamp: sendTime.toISOString()
+    }
+    setMessages(prev => [...prev, userMessage])
 
     try {
       const response = await fetch('http://localhost:8000/api/chat/generate', {
@@ -90,24 +103,57 @@ export function ChatInterface({ session }: ChatInterfaceProps) {
       })
 
       if (response.ok) {
-        // Reload messages to get both user and assistant messages
-        await loadMessages()
+        const responseData = await response.json()
+        const receiveTime = new Date()
+        const generationTime = receiveTime.getTime() - sendTime.getTime()
+        
+        // Add assistant message to UI
+        const assistantMessage: ChatMessage = {
+          id: responseData.message_id,
+          session_id: session.id,
+          role: 'assistant',
+          content: responseData.response,
+          timestamp: receiveTime.toISOString(),
+          generation_time: generationTime
+        }
+        setMessages(prev => [...prev, assistantMessage])
+        
+        // Focus back to message input after successful send with delay
+        setTimeout(() => {
+          messageInputRef.current?.focus()
+        }, 100)
       } else {
         console.error('Failed to send message')
+        // Remove the user message from UI since the request failed
+        setMessages(prev => prev.slice(0, -1))
         // Re-enable the input with the message
         setNewMessage(messageText)
+        setTimeout(() => {
+          messageInputRef.current?.focus()
+        }, 100)
       }
     } catch (error) {
       console.error('Error sending message:', error)
+      // Remove the user message from UI since the request failed
+      setMessages(prev => prev.slice(0, -1))
       setNewMessage(messageText)
+      setTimeout(() => {
+        messageInputRef.current?.focus()
+      }, 100)
     } finally {
       setIsLoading(false)
     }
   }
 
-  const formatModelName = (modelPath: string) => {
-    const parts = modelPath.split('/')
-    return parts[parts.length - 2] || 'Unknown Model'
+  const getDisplayModelName = () => {
+    if (session.model_name) {
+      return session.model_name
+    }
+    if (session.model_path) {
+      const parts = session.model_path.split('/')
+      return parts[parts.length - 2] || 'Unknown Model'
+    }
+    return 'Unknown Model'
   }
 
   return (
@@ -118,7 +164,9 @@ export function ChatInterface({ session }: ChatInterfaceProps) {
           {session.name}
         </CardTitle>
         <div className="text-sm text-muted-foreground">
-          モデル: {formatModelName(session.model_path)}
+          モデル: {getDisplayModelName()}
+          {session.model_name && <span className="ml-2 text-green-600">🤖 Ollama</span>}
+          {session.job_id && <span className="ml-2 text-blue-600">🎯 ファインチューニング済み</span>}
         </div>
       </CardHeader>
       
@@ -133,8 +181,8 @@ export function ChatInterface({ session }: ChatInterfaceProps) {
               チャットを開始してください
             </div>
           ) : (
-            messages.map((message) => (
-              <MessageBubble key={message.id} message={message} />
+            messages.map((message, index) => (
+              <MessageBubble key={message.id || `temp-${index}`} message={message} />
             ))
           )}
           
@@ -154,6 +202,7 @@ export function ChatInterface({ session }: ChatInterfaceProps) {
         <div className="border-t p-4 flex-shrink-0">
           <form onSubmit={handleSendMessage} className="flex gap-2">
             <Input
+              ref={messageInputRef}
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               placeholder="メッセージを入力..."

@@ -3,11 +3,12 @@
 import { User, Bot } from 'lucide-react'
 
 interface ChatMessage {
-  id: number
+  id?: number
   session_id: number
   role: 'user' | 'assistant'
   content: string
   timestamp: string
+  generation_time?: number // in milliseconds
 }
 
 interface MessageBubbleProps {
@@ -18,8 +19,17 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const formatTime = (timestamp: string) => {
     return new Date(timestamp).toLocaleTimeString('ja-JP', {
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      second: '2-digit'
     })
+  }
+
+  const formatGenerationTime = (generationTime: number) => {
+    if (generationTime < 1000) {
+      return `${generationTime}ms`
+    } else {
+      return `${(generationTime / 1000).toFixed(1)}s`
+    }
   }
 
   const isUser = message.role === 'user'
@@ -45,6 +55,11 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         
         <div className="text-xs text-muted-foreground mt-1 px-1">
           {formatTime(message.timestamp)}
+          {message.generation_time && !isUser && (
+            <span className="ml-2 text-blue-600">
+              生成時間: {formatGenerationTime(message.generation_time)}
+            </span>
+          )}
         </div>
       </div>
     </div>
