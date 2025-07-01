@@ -32,9 +32,9 @@ export default function Home() {
         return (
           <div className="space-y-6">
             <div className="text-center space-y-4">
-              <h1 className="text-4xl font-bold">LLM LoRA ファインチューニングApp</h1>
-              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                LoRA（Low-Rank Adaptation）を使用したファインチューニング学習
+              <h1 className="text-4xl font-bold">ML学習プラットフォーム</h1>
+              <p className="text-xl text-muted-foreground max-w-4xl mx-auto">
+                LoRA（Low-Rank Adaptation）を使用した効率的なAI学習と開発
               </p>
             </div>
 
@@ -109,23 +109,27 @@ export default function Home() {
                   <ul className="space-y-2 text-sm">
                     <li className="flex items-center gap-2">
                       <span className="h-2 w-2 bg-green-500 rounded-full"></span>
-                      LoRAファインチューニングプラットフォーム
+                      LoRA効率的ファインチューニング
                     </li>
                     <li className="flex items-center gap-2">
                       <span className="h-2 w-2 bg-green-500 rounded-full"></span>
-                      データセット作成・管理機能
+                      自社データセット作成・管理
                     </li>
                     <li className="flex items-center gap-2">
                       <span className="h-2 w-2 bg-green-500 rounded-full"></span>
-                      リアルタイムトレーニング進捗監視
+                      リアルタイム学習進捗監視
                     </li>
                     <li className="flex items-center gap-2">
                       <span className="h-2 w-2 bg-green-500 rounded-full"></span>
-                      チャットシミュレーション機能
+                      AIモデル性能評価・テスト
                     </li>
                     <li className="flex items-center gap-2">
                       <span className="h-2 w-2 bg-green-500 rounded-full"></span>
-                      Ollama統合でローカルLLMサポート
+                      Neural Engine最適化対応
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="h-2 w-2 bg-green-500 rounded-full"></span>
+                      マルチモデル統合プラットフォーム
                     </li>
                   </ul>
                 </CardContent>

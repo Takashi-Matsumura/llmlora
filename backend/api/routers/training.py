@@ -151,8 +151,9 @@ async def get_training_progress(job_id: int, db: AsyncSession = Depends(get_db))
         )
         metrics = metrics_result.scalars().all()
         
+        from models.schemas import TrainingMetrics as SchemaTrainingMetrics
         training_metrics = [
-            TrainingMetrics(
+            SchemaTrainingMetrics(
                 step=metric.step,
                 epoch=metric.epoch,
                 loss=metric.loss,

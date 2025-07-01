@@ -28,6 +28,12 @@ async def list_models():
                     size=3000000000,  # 3B parameters
                     digest="custom",
                     modified_at=datetime.now()
+                ),
+                OllamaModel(
+                    name="rinna-3.6b",
+                    size=3600000000,  # 3.6B parameters
+                    digest="custom",
+                    modified_at=datetime.now()
                 )
             ]
             

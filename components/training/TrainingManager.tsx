@@ -39,7 +39,7 @@ export function TrainingManager() {
       return
     }
     
-    if (!confirm(`トレーニングジョブ "${job?.name || id}" を削除してもよろしいですか？この操作は元に戻せません。`)) return
+    if (!confirm(`Job #${id}: "${job?.name || id}" を削除してもよろしいですか？この操作は元に戻せません。`)) return
 
     try {
       setIsLoading(true)
@@ -117,7 +117,7 @@ export function TrainingManager() {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-2xl font-bold">LLMトレーニング進捗</h2>
+            <h2 className="text-2xl font-bold">Job #{job.id}: {job.name}</h2>
             <p className="text-muted-foreground">トレーニングジョブをリアルタイムで監視</p>
           </div>
           <Button variant="outline" onClick={() => setSelectedJob(null)}>
@@ -153,7 +153,7 @@ export function TrainingManager() {
                 <div className="flex items-center gap-2">
                   {getStatusIcon(job.status)}
                   <div>
-                    <CardTitle className="text-lg">{job.name}</CardTitle>
+                    <CardTitle className="text-lg">Job #{job.id}: {job.name}</CardTitle>
                     <CardDescription>
                       {job.model_name} • 作成日 {formatDate(job.created_at)}
                     </CardDescription>

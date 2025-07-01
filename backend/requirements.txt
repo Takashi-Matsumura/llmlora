@@ -12,6 +12,7 @@ accelerate==1.8.1
 bitsandbytes==0.41.3
 sentencepiece==0.1.99
 protobuf==3.20.3
+coremltools==8.3.0
 
 # Database
 sqlalchemy==2.0.23

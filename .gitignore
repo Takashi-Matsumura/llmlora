@@ -54,8 +54,16 @@ ENV/
 # Training data and models (exclude large files)
 backend/model_cache/
 backend/training_data/
+backend/native_models/
+backend/neural_engine_env/
 *.bin
 *.safetensors
+*.tar.gz
+
+# Core ML models and optimization (large files)
+coreml_optimization/
+*.mlpackage/
+*.mlmodel
 
 # Docker logs
 *.log

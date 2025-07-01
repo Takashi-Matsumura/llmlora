@@ -300,15 +300,16 @@ class TrainingService:
             "codellama": "microsoft/DialoGPT-medium",
             
             # Japanese models
-            "japanese": "rinna/japanese-gpt-neox-3.6b",  # Japanese specialized model
+            "japanese": "rinna/japanese-gpt-neox-3.6b-instruction-sft",  # Japanese instruction-tuned model
             "rinna-1b": "rinna/japanese-gpt-1b",  # Lightweight Japanese model (recommended)
+            "rinna-3.6b": "rinna/japanese-gpt-neox-3.6b-instruction-sft",  # Instruction-tuned 3.6B model
             "gemma-3n": "google/gemma-2-2b",  # Gemma 3B model (mapped to available Gemma2-2B)
             
             # Fallback
             "fallback": "microsoft/DialoGPT-medium",
         }
         
-        return model_mapping.get(model_name, "rinna/japanese-gpt-neox-3.6b")
+        return model_mapping.get(model_name, "rinna/japanese-gpt-neox-3.6b-instruction-sft")
 
     def _get_target_modules(self, model_name: str, requested_modules: list) -> list:
         """Get appropriate target modules for the given model"""
