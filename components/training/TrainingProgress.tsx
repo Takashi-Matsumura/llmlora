@@ -214,6 +214,18 @@ export function TrainingProgress({ job }: TrainingProgressProps) {
             <span>{job.progress.toFixed(1)}%</span>
           </div>
           <Progress value={job.progress} className="w-full" />
+          
+          {/* Detailed stage progress */}
+          {job.current_stage && job.stage_progress !== undefined && (
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>{job.detailed_status || job.current_stage}</span>
+                <span>{job.stage_progress.toFixed(1)}%</span>
+              </div>
+              <Progress value={job.stage_progress} className="w-full h-1" />
+            </div>
+          )}
+          
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>Epoch {job.current_epoch} / {job.total_epochs}</span>
             {progress && (
@@ -245,7 +257,13 @@ export function TrainingProgress({ job }: TrainingProgressProps) {
           <div className="space-y-1">
             <p className="text-sm font-medium">ETA</p>
             <p className="text-2xl font-bold">
-              {job.status === 'running' && job.started_at && job.progress > 0 ? (
+              {job.estimated_time_remaining ? (
+                (() => {
+                  const minutes = Math.floor(job.estimated_time_remaining / 60)
+                  const seconds = job.estimated_time_remaining % 60
+                  return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`
+                })()
+              ) : job.status === 'running' && job.started_at && job.progress > 0 ? (
                 (() => {
                   const elapsed = new Date().getTime() - new Date(job.started_at).getTime()
                   const estimatedTotal = (elapsed / job.progress) * 100

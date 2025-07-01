@@ -41,7 +41,7 @@ export function ChatManager() {
 
   const loadSessions = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/chat/sessions')
+      const response = await fetch('/api/chat/sessions')
       if (response.ok) {
         const sessionsData = await response.json()
         setSessions(sessionsData)
@@ -53,7 +53,7 @@ export function ChatManager() {
 
   const loadCompletedJobs = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/chat/completed-jobs')
+      const response = await fetch('/api/chat/completed-jobs')
       if (response.ok) {
         const jobsData = await response.json()
         setCompletedJobs(jobsData)
@@ -70,7 +70,7 @@ export function ChatManager() {
 
   const handleCreateSession = async (sessionData: { name: string; job_id?: number; model_name?: string; settings?: any }) => {
     try {
-      const response = await fetch('http://localhost:8000/api/chat/sessions', {
+      const response = await fetch('/api/chat/sessions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -94,7 +94,7 @@ export function ChatManager() {
 
   const handleDeleteSession = async (sessionId: number) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/chat/sessions/${sessionId}`, {
+      const response = await fetch(`/api/chat/sessions/${sessionId}`, {
         method: 'DELETE',
       })
 

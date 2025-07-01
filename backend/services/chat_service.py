@@ -50,14 +50,11 @@ class ChatService:
             
             # Handle Ollama model
             elif session_data.model_name:
-                # Skip validation for custom models (rinna-1b, gemma-3n, rinna-3.6b, etc.)
-                custom_models = ["rinna-1b", "gemma-3n", "rinna-3.6b"]
-                if session_data.model_name not in custom_models:
-                    # Verify Ollama model exists
-                    from services.ollama_service import OllamaService
-                    async with OllamaService() as ollama:
-                        if not await ollama.check_model_exists(session_data.model_name):
-                            raise ValueError(f"Ollama model {session_data.model_name} not found")
+                # Verify Ollama model exists
+                from services.ollama_service import OllamaService
+                async with OllamaService() as ollama:
+                    if not await ollama.check_model_exists(session_data.model_name):
+                        raise ValueError(f"Ollama model {session_data.model_name} not found")
             
             else:
                 raise ValueError("Either job_id or model_name must be provided")
@@ -149,23 +146,13 @@ class ChatService:
             
             try:
                 # Generate response based on session type
-                if session.model_name:  # Ollama model or custom model
-                    custom_models = ["rinna-1b", "gemma-3n", "rinna-3.6b"]
-                    if session.model_name in custom_models:
-                        # Use HuggingFace model directly for custom models
-                        response_text = await self._generate_with_custom_model(
-                            session.model_name,
-                            request.message,
-                            temperature=request.temperature,
-                            max_tokens=request.max_tokens
-                        )
-                    else:
-                        response_text = await self._generate_with_ollama(
-                            session.model_name,
-                            request.message,
-                            temperature=request.temperature,
-                            max_tokens=request.max_tokens
-                        )
+                if session.model_name:  # Ollama model
+                    response_text = await self._generate_with_ollama(
+                        session.model_name,
+                        request.message,
+                        temperature=request.temperature,
+                        max_tokens=request.max_tokens
+                    )
                 else:  # Fine-tuned model
                     # Check if Neural Engine model is available for this job
                     if session.job_id and self.is_neural_engine_available(session.job_id):

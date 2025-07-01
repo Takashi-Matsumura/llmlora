@@ -91,6 +91,12 @@ class TrainingJobResponse(BaseModel):
     started_at: Optional[datetime]
     completed_at: Optional[datetime]
     error_message: Optional[str]
+    
+    # Detailed progress tracking
+    current_stage: Optional[str] = None
+    stage_progress: Optional[float] = None
+    detailed_status: Optional[str] = None
+    estimated_time_remaining: Optional[int] = None
 
     class Config:
         from_attributes = True

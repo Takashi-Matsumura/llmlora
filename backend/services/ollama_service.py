@@ -7,8 +7,8 @@ from loguru import logger
 
 class OllamaService:
     def __init__(self):
-        self.base_url = os.getenv("OLLAMA_URL", "http://localhost:11434")
-        self.client = httpx.AsyncClient(timeout=30.0)
+        self.base_url = os.getenv("OLLAMA_URL", "http://ollama:11434")
+        self.client = httpx.AsyncClient(timeout=60.0)
 
     async def __aenter__(self):
         return self
@@ -60,19 +60,37 @@ class OllamaService:
 
     async def generate(self, model_name: str, prompt: str, **kwargs) -> Dict[str, Any]:
         try:
+            logger.info(f"Sending request to Ollama: model={model_name}, prompt='{prompt[:50]}...'")
+            logger.info(f"Request options: {kwargs}")
+            
+            request_payload = {
+                "model": model_name,
+                "prompt": prompt,
+                "stream": False,
+                **kwargs
+            }
+            
             response = await self.client.post(
                 f"{self.base_url}/api/generate",
-                json={
-                    "model": model_name,
-                    "prompt": prompt,
-                    "stream": False,
-                    **kwargs
-                }
+                json=request_payload
             )
+            
+            logger.info(f"Ollama response status: {response.status_code}")
+            
             response.raise_for_status()
-            return response.json()
+            result = response.json()
+            
+            logger.info(f"Ollama response received: {len(result.get('response', ''))} characters")
+            
+            return result
         except httpx.HTTPError as e:
-            logger.error(f"Error generating with model {model_name}: {e}")
+            logger.error(f"HTTP Error generating with model {model_name}: {e}")
+            logger.error(f"Response content: {e.response.text if hasattr(e, 'response') else 'No response'}")
+            raise Exception(f"Failed to generate: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error generating with model {model_name}: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             raise Exception(f"Failed to generate: {e}")
 
     async def health_check(self) -> bool:

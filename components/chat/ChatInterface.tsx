@@ -55,7 +55,7 @@ export function ChatInterface({ session }: ChatInterfaceProps) {
   const loadMessages = async () => {
     try {
       setLoadingMessages(true)
-      const response = await fetch(`http://localhost:8000/api/chat/sessions/${session.id}/messages`)
+      const response = await fetch(`/api/chat/sessions/${session.id}/messages`)
       if (response.ok) {
         const messagesData = await response.json()
         setMessages(messagesData)
@@ -89,7 +89,7 @@ export function ChatInterface({ session }: ChatInterfaceProps) {
     setMessages(prev => [...prev, userMessage])
 
     try {
-      const response = await fetch('http://localhost:8000/api/chat/generate', {
+      const response = await fetch('/api/chat/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -163,10 +163,24 @@ export function ChatInterface({ session }: ChatInterfaceProps) {
           <Bot className="h-5 w-5" />
           {session.name}
         </CardTitle>
-        <div className="text-sm text-muted-foreground">
-          モデル: {getDisplayModelName()}
-          {session.model_name && <span className="ml-2 text-green-600">🤖 Ollama</span>}
-          {session.job_id && <span className="ml-2 text-blue-600">🎯 ファインチューニング済み</span>}
+        <div className="space-y-1">
+          <div className="text-sm text-muted-foreground">
+            モデル: {getDisplayModelName()}
+          </div>
+          <div className="flex items-center gap-2">
+            {session.model_name && (
+              <div className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded-full text-xs">
+                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                <span>Ollamaサーバー実行</span>
+              </div>
+            )}
+            {session.job_id && (
+              <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-full text-xs">
+                <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                <span>ファインチューニング済み実行</span>
+              </div>
+            )}
+          </div>
         </div>
       </CardHeader>
       

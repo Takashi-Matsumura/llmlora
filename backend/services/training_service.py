@@ -75,6 +75,8 @@ class TrainingService:
             job.error_message = "モデルをダウンロード中..."
             await db.commit()
             
+            # Stage 2: Loading tokenizer
+            await self._update_job_stage(db, job.id, "TOKENIZER", 20.0, "トークナイザーをロード中...", 240)
             logger.info(f"Loading tokenizer for {model_name}...")
             tokenizer = AutoTokenizer.from_pretrained(
                 model_name,
@@ -91,8 +93,11 @@ class TrainingService:
             dtype = torch.float16 if device == "cuda" else torch.float32
             
             logger.info(f"Loading model {model_name} with dtype {dtype}...")
-            job.error_message = "モデルファイルをロード中..."
-            await db.commit()
+            # Stage 1: Model downloading/loading
+            await self._update_job_stage(db, job.id, "DOWNLOADING", 0.0, "HuggingFaceからモデルをダウンロード中...", 300)
+            
+            # Stage 3: Loading model weights
+            await self._update_job_stage(db, job.id, "MODEL_LOADING", 40.0, "モデルの重みをメモリにロード中...", 180)
             
             # Special memory-efficient loading for large models like Gemma2-2B
             if "gemma-2-2b" in model_name:
@@ -183,6 +188,9 @@ class TrainingService:
             job.error_message = "LoRA設定を適用中..."
             await db.commit()
             
+            # Stage 4: Applying LoRA configuration
+            await self._update_job_stage(db, job.id, "LORA_CONFIG", 60.0, "LoRA設定を適用中...", 120)
+            
             model = get_peft_model(model, lora_config)
             model.print_trainable_parameters()
             
@@ -196,8 +204,8 @@ class TrainingService:
 
             # Prepare dataset
             logger.info("Preparing training dataset...")
-            job.error_message = "データセットを準備中..."
-            await db.commit()
+            # Stage 5: Dataset preparation
+            await self._update_job_stage(db, job.id, "DATASET_PREP", 75.0, "データセットを準備中...", 60)
             
             train_dataset = self._prepare_dataset(dataset.data, tokenizer, job.training_config["max_length"])
             logger.info(f"Dataset prepared with {len(train_dataset)} samples")
@@ -256,6 +264,9 @@ class TrainingService:
             job.error_message = None
             job.total_steps = len(train_dataset) // job.training_config["batch_size"] * job.training_config["num_epochs"]
             await db.commit()
+            
+            # Stage 6: Training start
+            await self._update_job_stage(db, job.id, "TRAINING_START", 90.0, "トレーニングを開始中...", 30)
             
             # Start training
             logger.info(f"Starting training for job {job.id} with {job.total_steps} total steps")
@@ -402,6 +413,25 @@ class TrainingService:
             await db.commit()
         except Exception as e:
             logger.error(f"Failed to update job error: {e}")
+
+    async def _update_job_stage(self, db: AsyncSession, job_id: int, stage: str, stage_progress: float = 0.0, detailed_status: str = None, estimated_time: int = None):
+        """Update job with detailed progress information"""
+        try:
+            await db.execute(
+                update(TrainingJob)
+                .where(TrainingJob.id == job_id)
+                .values(
+                    current_stage=stage,
+                    stage_progress=stage_progress,
+                    detailed_status=detailed_status or stage,
+                    estimated_time_remaining=estimated_time
+                )
+            )
+            await db.commit()
+            logger.info(f"Job {job_id} stage updated: {stage} ({stage_progress:.1f}%)")
+        except Exception as e:
+            logger.error(f"Failed to update job stage: {e}")
+            await db.rollback()
 
 class TrainerWithProgress(Trainer):
     """Custom trainer that tracks progress to database"""

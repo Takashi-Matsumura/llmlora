@@ -50,6 +50,12 @@ export interface TrainingJob {
   started_at?: string
   completed_at?: string
   error_message?: string
+  
+  // Detailed progress tracking
+  current_stage?: string
+  stage_progress?: number
+  detailed_status?: string
+  estimated_time_remaining?: number
 }
 
 export interface TrainingMetrics {

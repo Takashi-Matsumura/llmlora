@@ -49,6 +49,12 @@ class TrainingJob(Base):
     # Error handling
     error_message = Column(Text, nullable=True)
     
+    # Detailed progress tracking
+    current_stage = Column(String(100), nullable=True)  # Current processing stage
+    stage_progress = Column(Float, default=0.0)  # Progress within current stage (0-100%)
+    detailed_status = Column(Text, nullable=True)  # Detailed status message
+    estimated_time_remaining = Column(Integer, nullable=True)  # Estimated time in seconds
+    
     # Output paths
     output_dir = Column(String(500), nullable=True)
     model_path = Column(String(500), nullable=True)

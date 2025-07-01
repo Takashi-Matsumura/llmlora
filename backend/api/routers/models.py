@@ -6,41 +6,14 @@ router = APIRouter()
 
 @router.get("/", response_model=ModelListResponse)
 async def list_models():
-    """Get list of available models from Ollama"""
+    """Get list of available models from Ollama server"""
     async with OllamaService() as ollama:
         try:
-            # Get models from Ollama
+            # Get models directly from Ollama server
             ollama_models = await ollama.list_models()
             
-            # Add our custom lightweight models
-            from models.schemas import OllamaModel
-            from datetime import datetime
-            
-            custom_models = [
-                OllamaModel(
-                    name="rinna-1b",
-                    size=1000000000,  # 1B parameters
-                    digest="custom",
-                    modified_at=datetime.now()
-                ),
-                OllamaModel(
-                    name="gemma-3n",
-                    size=3000000000,  # 3B parameters
-                    digest="custom",
-                    modified_at=datetime.now()
-                ),
-                OllamaModel(
-                    name="rinna-3.6b",
-                    size=3600000000,  # 3.6B parameters
-                    digest="custom",
-                    modified_at=datetime.now()
-                )
-            ]
-            
-            # Combine Ollama models with custom models
-            all_models = ollama_models.models + custom_models
-            
-            return ModelListResponse(models=all_models)
+            # Return only the models that are actually available in Ollama
+            return ollama_models
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 

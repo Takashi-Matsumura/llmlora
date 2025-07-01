@@ -130,21 +130,25 @@ export function NewSessionDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="model">モデル選択</Label>
+              <Label htmlFor="model">モデル実行環境の選択</Label>
               <Select value={selectedModel} onValueChange={setSelectedModel} required>
                 <SelectTrigger>
-                  <SelectValue placeholder="モデルを選択してください" />
+                  <SelectValue placeholder="実行環境とモデルを選択してください" />
                 </SelectTrigger>
                 <SelectContent>
                   {/* ファインチューニング済みモデル */}
                   {completedJobs.length > 0 && (
                     <>
-                      <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                        ファインチューニング済みモデル
+                      <div className="px-2 py-1.5 text-sm font-semibold text-blue-600 bg-blue-50 rounded">
+                        🎯 ファインチューニング済みモデル (PEFT/Neural Engine)
                       </div>
                       {completedJobs.map((job) => (
                         <SelectItem key={`training:${job.id}`} value={`training:${job.id}`}>
-                          🎯 {job.name} ({job.model_name})
+                          <div className="flex items-center space-x-2">
+                            <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                            <span>{job.name}</span>
+                            <span className="text-xs text-muted-foreground">({job.model_name})</span>
+                          </div>
                         </SelectItem>
                       ))}
                     </>
@@ -154,14 +158,18 @@ export function NewSessionDialog({
                   {ollamaModels.length > 0 && (
                     <>
                       {completedJobs.length > 0 && (
-                        <div className="border-t my-1" />
+                        <div className="border-t my-2" />
                       )}
-                      <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                        オリジナルモデル (Ollama)
+                      <div className="px-2 py-1.5 text-sm font-semibold text-green-600 bg-green-50 rounded">
+                        🤖 オリジナルモデル (Ollama サーバー)
                       </div>
                       {ollamaModels.map((model) => (
                         <SelectItem key={`ollama:${model.name}`} value={`ollama:${model.name}`}>
-                          🤖 {model.name} ({(model.size / 1e9).toFixed(1)}GB)
+                          <div className="flex items-center space-x-2">
+                            <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                            <span>{model.name}</span>
+                            <span className="text-xs text-muted-foreground">({(model.size / 1e9).toFixed(1)}GB)</span>
+                          </div>
                         </SelectItem>
                       ))}
                     </>
@@ -180,6 +188,18 @@ export function NewSessionDialog({
                   )}
                 </SelectContent>
               </Select>
+              
+              {/* 実行環境の説明 */}
+              <div className="text-xs text-muted-foreground space-y-1">
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                  <span>ファインチューニング済み: カスタマイズされたモデル（高速・高精度）</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  <span>Ollamaサーバー: オリジナルモデル（比較・ベースライン用）</span>
+                </div>
+              </div>
             </div>
 
             <div className="space-y-6">
